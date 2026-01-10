@@ -51,6 +51,8 @@ export class TextureManager {
         drawTile(2, 0, '#795548', '#8d6e63', 'D');
         // 3,0: Stone
         drawTile(3, 0, '#9e9e9e', '#bdbdbd', 'S');
+        // 4,0: Skin (For Hand/Body)
+        drawTile(4, 0, '#ffdbac', '#f1c27d', 'SK');
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
