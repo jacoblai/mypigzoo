@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyPigZoo - Voxel Engine</title>
+    <style>
+      body { margin: 0; overflow: hidden; background: #000; }
+      #app { width: 100vw; height: 100vh; position: relative; }
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 10;
+      }
+      #crosshair::before, #crosshair::after {
+        content: '';
+        position: absolute;
+        background: white;
+        opacity: 0.8;
+      }
+      #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
+      #crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="crosshair"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
