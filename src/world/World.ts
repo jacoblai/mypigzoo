@@ -8,7 +8,15 @@ export class World {
     private generator: TerrainGenerator;
     
     public renderDistance = 4;
-    public renderDistanceY = 2; // Support vertical chunks
+    public renderDistanceY = 2; 
+
+    // Task Queues for performance
+    private chunkLoadQueue: {x: number, y: number, z: number}[] = [];
+    private meshUpdateQueue: Set<string> = new Set();
+    
+    // Performance constants
+    private readonly MAX_CHUNKS_PER_FRAME = 1;
+    private readonly MAX_MESH_UPDATES_PER_FRAME = 2;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -34,13 +42,26 @@ export class World {
                     currentChunkKeys.add(key);
 
                     if (!this.chunks.has(key)) {
-                        this.loadChunk(x, y, z);
+                        // Check if already in queue to avoid duplicates
+                        if (!this.chunkLoadQueue.some(c => c.x === x && c.y === y && c.z === z)) {
+                            this.chunkLoadQueue.push({x, y, z});
+                        }
                     }
                 }
             }
         }
 
-        // 2. Identify and unload chunks that are out of range
+        // Sort queue by distance to player (Load closest first)
+        this.chunkLoadQueue.sort((a, b) => {
+            const distA = Math.hypot(a.x - px, a.y - py, a.z - pz);
+            const distB = Math.hypot(b.x - px, b.y - py, b.z - pz);
+            return distA - distB;
+        });
+
+        // 2. Process queues with budget
+        this.processQueues();
+
+        // 3. Unload chunks that are out of range
         for (const [key, chunk] of this.chunks) {
             if (!currentChunkKeys.has(key)) {
                 this.unloadChunk(key, chunk);
@@ -48,34 +69,65 @@ export class World {
         }
     }
 
+    private processQueues() {
+        // Budget 1: Loading Chunks (Terrain generation)
+        let chunksLoaded = 0;
+        while (this.chunkLoadQueue.length > 0 && chunksLoaded < this.MAX_CHUNKS_PER_FRAME) {
+            const next = this.chunkLoadQueue.shift();
+            if (next) {
+                this.loadChunk(next.x, next.y, next.z);
+                chunksLoaded++;
+            }
+        }
+
+        // Budget 2: Updating Meshes (Geometry generation)
+        let meshesUpdated = 0;
+        const updateList = Array.from(this.meshUpdateQueue);
+        while (updateList.length > 0 && meshesUpdated < this.MAX_MESH_UPDATES_PER_FRAME) {
+            const key = updateList.shift();
+            if (key) {
+                this.meshUpdateQueue.delete(key);
+                const coords = key.split(',').map(Number);
+                this.updateChunkMesh(coords[0] * Chunk.SIZE, coords[1] * Chunk.SIZE, coords[2] * Chunk.SIZE);
+                meshesUpdated++;
+            }
+        }
+    }
+
     private loadChunk(x: number, y: number, z: number) {
+        const key = this.getChunkKey(x, y, z);
+        if (this.chunks.has(key)) return;
+
         const chunk = new Chunk(x, y, z);
-        this.chunks.set(this.getChunkKey(x, y, z), chunk);
+        this.chunks.set(key, chunk);
         
         this.generator.generateChunk(chunk);
         this.scene.add(chunk.mesh);
         
-        // Update the chunk and its neighbors to ensure seamless rendering
-        this.updateChunkAndNeighbors(x, y, z);
+        // Notify neighbors to update their mesh (culling might change)
+        this.enqueueChunkAndNeighbors(x, y, z);
+    }
+
+    private enqueueChunkAndNeighbors(cx: number, cy: number, cz: number) {
+        const neighbors = [
+            [0, 0, 0], 
+            [1, 0, 0], [-1, 0, 0],
+            [0, 1, 0], [0, -1, 0],
+            [0, 0, 1], [0, 0, -1]
+        ];
+
+        for (const [dx, dy, dz] of neighbors) {
+            const key = this.getChunkKey(cx + dx, cy + dy, cz + dz);
+            if (this.chunks.has(key)) {
+                this.meshUpdateQueue.add(key);
+            }
+        }
     }
 
     private unloadChunk(key: string, chunk: Chunk) {
         this.scene.remove(chunk.mesh);
         chunk.dispose();
         this.chunks.delete(key);
-    }
-
-    private updateChunkAndNeighbors(cx: number, cy: number, cz: number) {
-        for (let x = cx - 1; x <= cx + 1; x++) {
-            for (let y = cy - 1; y <= cy + 1; y++) {
-                for (let z = cz - 1; z <= cz + 1; z++) {
-                    const key = this.getChunkKey(x, y, z);
-                    if (this.chunks.has(key)) {
-                        this.updateChunkMesh(x * Chunk.SIZE, y * Chunk.SIZE, z * Chunk.SIZE);
-                    }
-                }
-            }
-        }
     }
 
     public getVoxel(x: number, y: number, z: number): number {
@@ -106,22 +158,28 @@ export class World {
         const lz = Math.floor(((z % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);
 
         chunk.setVoxel(lx, ly, lz, type);
-        this.updateVoxelMesh(x, y, z);
-
-        // Notify neighbors of potential mesh changes
-        if (lx === 0) this.updateVoxelMesh(x - 1, y, z);
-        if (lx === Chunk.SIZE - 1) this.updateVoxelMesh(x + 1, y, z);
-        if (ly === 0) this.updateVoxelMesh(x, y - 1, z);
-        if (ly === Chunk.SIZE - 1) this.updateVoxelMesh(x, y + 1, z);
-        if (lz === 0) this.updateVoxelMesh(x, y, z - 1);
-        if (lz === Chunk.SIZE - 1) this.updateVoxelMesh(x, y, z + 1);
+        
+        // Use the queue system for mesh updates even for setVoxel
+        this.enqueueVoxelNeighbors(x, y, z);
     }
 
-    private updateVoxelMesh(x: number, y: number, z: number) {
+    private enqueueVoxelNeighbors(x: number, y: number, z: number) {
         const cx = Math.floor(x / Chunk.SIZE);
         const cy = Math.floor(y / Chunk.SIZE);
         const cz = Math.floor(z / Chunk.SIZE);
-        this.updateChunkMesh(cx * Chunk.SIZE, cy * Chunk.SIZE, cz * Chunk.SIZE);
+        
+        const lx = Math.floor(((x % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);
+        const ly = Math.floor(((y % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);
+        const lz = Math.floor(((z % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);
+
+        this.meshUpdateQueue.add(this.getChunkKey(cx, cy, cz));
+
+        if (lx === 0) this.meshUpdateQueue.add(this.getChunkKey(cx - 1, cy, cz));
+        if (lx === Chunk.SIZE - 1) this.meshUpdateQueue.add(this.getChunkKey(cx + 1, cy, cz));
+        if (ly === 0) this.meshUpdateQueue.add(this.getChunkKey(cx, cy - 1, cz));
+        if (ly === Chunk.SIZE - 1) this.meshUpdateQueue.add(this.getChunkKey(cx, cy + 1, cz));
+        if (lz === 0) this.meshUpdateQueue.add(this.getChunkKey(cx, cy, cz - 1));
+        if (lz === Chunk.SIZE - 1) this.meshUpdateQueue.add(this.getChunkKey(cx, cy, cz + 1));
     }
 
     private updateChunkMesh(worldX: number, worldY: number, worldZ: number) {

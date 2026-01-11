@@ -11,6 +11,7 @@ export class CoreEngine {
 
     constructor(container: HTMLElement) {
         this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x000000); 
 
         this.camera = new THREE.PerspectiveCamera(
             75,
