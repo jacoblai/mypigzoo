@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { World } from '../world/World';
 import { SelectionBox } from './SelectionBox';
-import { BlockType, BLOCK_TEXTURES } from '../world/Block';
+import { BlockType, BLOCK_DATA } from '../world/Block';
 import { Physics } from '../utils/Physics';
 import { Inventory } from './Inventory';
 import { Hand } from './Hand';
@@ -50,6 +50,12 @@ export class Player {
     private isThirdPerson = false;
     private isInventoryOpen = false;
 
+    private isMining = false;
+    private miningTarget: THREE.Vector3 | null = null;
+    private miningProgress = 0;
+    private swingTimer = 0;
+    private readonly SWING_INTERVAL = 0.25;
+
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement, scene: THREE.Scene, world: World) {
         this.world = world;
         this.camera = camera;
@@ -86,6 +92,7 @@ export class Player {
         window.addEventListener('contextmenu', (e) => e.preventDefault());
         
         window.addEventListener('mousedown', (e) => this.onMouseDown(e));
+        window.addEventListener('mouseup', (e) => this.onMouseUp(e));
         window.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -128,15 +135,24 @@ export class Player {
             return;
         }
         
-        this.hand.swing();
-
         // 兼容 macOS: Ctrl + 左键 视为右键
         const isRightClick = event.button === 2 || (event.button === 0 && event.ctrlKey);
 
         if (isRightClick) {
+            this.hand.swing();
             this.placeBlock();
         } else if (event.button === 0) {
-            this.destroyBlock();
+            this.isMining = true;
+            // 立即开始摆动，后续由 handleMining 维持
+            this.hand.swing();
+        }
+    }
+
+    private onMouseUp(event: MouseEvent) {
+        if (event.button === 0) {
+            this.isMining = false;
+            this.miningTarget = null;
+            this.miningProgress = 0;
         }
     }
 
@@ -155,6 +171,7 @@ export class Player {
         if (this.isInventoryOpen) {
             this.controls.unlock();
             this.inventoryUI.toggle(true);
+            this.resetMining();
         } else {
             this.controls.lock();
             this.inventoryUI.toggle(false);
@@ -184,8 +201,8 @@ export class Player {
                 this.placeBlock();
                 break;
             case 'KeyF':
+                this.isMining = true;
                 this.hand.swing();
-                this.destroyBlock();
                 break;
             case 'Digit1': this.selectSlot(0); break;
             case 'Digit2': this.selectSlot(1); break;
@@ -219,6 +236,11 @@ export class Player {
             case 'KeyS': this.moveBackward = false; break;
             case 'KeyA': this.moveLeft = false; break;
             case 'KeyD': this.moveRight = false; break;
+            case 'KeyF': 
+                this.isMining = false;
+                this.miningTarget = null;
+                this.miningProgress = 0;
+                break;
             case 'KeyI': this.lookUp = false; break;
             case 'KeyK': this.lookDown = false; break;
             case 'KeyJ': this.lookLeft = false; break;
@@ -226,21 +248,63 @@ export class Player {
         }
     }
 
-    private destroyBlock() {
-        const hit = this.selectionBox.update();
-        if (hit) {
-            const blockType = this.world.getVoxel(hit.position.x, hit.position.y, hit.position.z);
-            if (blockType !== BlockType.AIR) {
-                // Spawn drop BEFORE setting to AIR
-                this.entityManager.spawnDrop(blockType, hit.position.clone().add(new THREE.Vector3(0.5, 0.5, 0.5)));
-                this.world.setVoxel(hit.position.x, hit.position.y, hit.position.z, BlockType.AIR);
-                this.audioManager.play('break');
-                
-                // 增加经验值和精疲力竭度
-                this.stats.addExperience(1);
-                this.stats.addExhaustion(0.005);
-            }
+    private handleMining(delta: number, hit: any) {
+        if (!this.isMining) return;
+
+        if (!hit) {
+            this.resetMining();
+            return;
         }
+
+        const voxel = this.world.getVoxel(hit.position.x, hit.position.y, hit.position.z);
+        if (voxel === BlockType.AIR) {
+            this.resetMining();
+            return;
+        }
+
+        // Check if we are still hitting the same block
+        const hitPos = hit.position;
+        if (!this.miningTarget || !this.miningTarget.equals(hitPos)) {
+            this.miningTarget = hitPos.clone();
+            this.miningProgress = 0;
+            this.swingTimer = 0;
+        }
+
+        // Continue swinging hand
+        this.swingTimer += delta;
+        if (this.swingTimer >= this.SWING_INTERVAL) {
+            this.hand.swing();
+            this.audioManager.play('step'); // Use step sound for hitting for now
+            this.swingTimer = 0;
+        }
+
+        // Progress mining
+        const blockData = (BLOCK_DATA as any)[voxel];
+        const hardness = blockData?.hardness ?? 0.2;
+        
+        this.miningProgress += delta;
+
+        if (this.miningProgress >= hardness) {
+            this.performDestroyBlock(hit.position, voxel);
+            this.resetMining();
+        }
+    }
+
+    private resetMining() {
+        this.miningTarget = null;
+        this.miningProgress = 0;
+        this.swingTimer = 0;
+    }
+
+    private performDestroyBlock(position: THREE.Vector3, blockType: number) {
+        // Spawn drop BEFORE setting to AIR
+        this.entityManager.spawnDrop(blockType, position.clone().add(new THREE.Vector3(0.5, 0.5, 0.5)));
+        this.world.setVoxel(position.x, position.y, position.z, BlockType.AIR);
+        this.audioManager.play('break');
+        
+        // 增加经验值和精疲力竭度
+        this.stats.addExperience(1);
+        this.stats.addExhaustion(0.005);
     }
 
     private placeBlock() {
@@ -248,7 +312,7 @@ export class Player {
         if (!selected || selected.count <= 0) return;
 
         // 饮食逻辑优先
-        const blockData = (BLOCK_TEXTURES as any)[selected.type];
+        const blockData = (BLOCK_DATA as any)[selected.type];
         if (blockData?.isEdible && this.stats.hunger < 20) {
             this.stats.eat(blockData.nutrition || 1, blockData.saturation || 0.5);
             this.inventory.consumeSelected(1);
@@ -286,21 +350,26 @@ export class Player {
 
     public update(delta: number) {
         this.entityManager.update(delta, this.position, this.inventory);
-        this.selectionBox.update();
-
-        // 更新状态逻辑
-        this.stats.update(delta);
-        this.statsUI.update();
+        const hit = this.selectionBox.update();
 
         if (!this.controls.isLocked && !this.isInventoryOpen) {
             this.hand.update(delta, false);
+            this.resetMining();
             return;
         }
 
         if (this.isInventoryOpen) {
             this.hand.update(delta, false);
+            this.resetMining();
             return;
         }
+
+        // 处理挖掘逻辑
+        this.handleMining(delta, hit);
+
+        // 更新状态逻辑
+        this.stats.update(delta);
+        this.statsUI.update();
 
         // 0. 处理键盘视角旋转 (I J K L) - 采用互斥逻辑防止视角倾斜
         const lookSpeed = 2.0;
