@@ -20,6 +20,10 @@ export class Player {
     private moveBackward = false;
     private moveLeft = false;
     private moveRight = false;
+    private lookUp = false;
+    private lookDown = false;
+    private lookLeft = false;
+    private lookRight = false;
     private canJump = false;
     
     private world: World;
@@ -117,6 +121,10 @@ export class Player {
             case 'KeyC':
                 this.isThirdPerson = !this.isThirdPerson;
                 break;
+            case 'KeyI': this.lookUp = true; break;
+            case 'KeyK': this.lookDown = true; break;
+            case 'KeyJ': this.lookLeft = true; break;
+            case 'KeyL': this.lookRight = true; break;
         }
     }
 
@@ -126,6 +134,10 @@ export class Player {
             case 'KeyS': this.moveBackward = false; break;
             case 'KeyA': this.moveLeft = false; break;
             case 'KeyD': this.moveRight = false; break;
+            case 'KeyI': this.lookUp = false; break;
+            case 'KeyK': this.lookDown = false; break;
+            case 'KeyJ': this.lookLeft = false; break;
+            case 'KeyL': this.lookRight = false; break;
         }
     }
 
@@ -166,6 +178,16 @@ export class Player {
             this.hand.update(delta, false);
             return;
         }
+
+        // 0. 处理键盘视角旋转 (I J K L)
+        const lookSpeed = 2.0;
+        if (this.lookUp) this.camera.rotation.x += lookSpeed * delta;
+        if (this.lookDown) this.camera.rotation.x -= lookSpeed * delta;
+        if (this.lookLeft) this.camera.rotation.y += lookSpeed * delta;
+        if (this.lookRight) this.camera.rotation.y -= lookSpeed * delta;
+        
+        // 限制仰角，防止翻转
+        this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));
 
         // 1. 物理环境准备 (应用阻力)
         this.velocity.x -= this.velocity.x * 10.0 * delta;
