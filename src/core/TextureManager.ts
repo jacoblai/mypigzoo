@@ -19,6 +19,13 @@ export class TextureManager {
         return this.material;
     }
 
+    public static getAtlasDataURL(): string {
+        if (!this.texture) {
+            this.getMaterial();
+        }
+        return (this.texture.image as HTMLCanvasElement).toDataURL();
+    }
+
     private static createDefaultAtlas(): THREE.Texture {
         const canvas = document.createElement('canvas');
         canvas.width = 256;

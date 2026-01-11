@@ -8,6 +8,8 @@ import { Inventory } from './Inventory';
 import { Hand } from './Hand';
 import { CharacterModel } from './CharacterModel';
 import { AudioManager } from '../core/AudioManager';
+import { EntityManager } from '../world/EntityManager';
+import { InventoryUI } from './InventoryUI';
 
 export class Player {
     private controls: PointerLockControls;
@@ -29,15 +31,18 @@ export class Player {
     private world: World;
     private selectionBox: SelectionBox;
     private inventory: Inventory;
+    private inventoryUI: InventoryUI;
     private hand: Hand;
     private characterModel: CharacterModel;
     private audioManager: AudioManager;
+    private entityManager: EntityManager;
     
     private stepTimer = 0;
     private walkTime = 0;
     private readonly STEP_INTERVAL = 0.45;
     
     private isThirdPerson = false;
+    private isInventoryOpen = false;
 
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement, scene: THREE.Scene, world: World) {
         this.world = world;
@@ -48,16 +53,20 @@ export class Player {
         this.controls = new PointerLockControls(camera, domElement);
         this.selectionBox = new SelectionBox(scene, world, camera);
         this.inventory = new Inventory();
+        this.inventoryUI = new InventoryUI(this.inventory);
         this.hand = new Hand();
         this.characterModel = new CharacterModel();
+        
+        this.audioManager = new AudioManager(camera);
+        this.audioManager.init();
+
+        this.entityManager = new EntityManager(scene, world, this.audioManager);
         
         // Add character model to scene
         scene.add(this.characterModel.group);
         
-        this.audioManager = new AudioManager(camera);
-        this.audioManager.init();
-        
-        this.hand.setBlock(this.inventory.getSelectedBlock());
+        const selected = this.inventory.getSelectedSlot();
+        this.hand.setBlock(selected ? selected.type : BlockType.AIR);
 
         // 屏蔽浏览器右键菜单，确保右键放置功能可用
         window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -67,6 +76,28 @@ export class Player {
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
         window.addEventListener('resize', () => this.hand.onResize());
+
+        window.addEventListener('inventory-changed', () => {
+            this.updateHand();
+            this.inventoryUI.update();
+        });
+
+        this.controls.addEventListener('lock', () => {
+            this.isInventoryOpen = false;
+            this.inventoryUI.toggle(false);
+        });
+
+        this.controls.addEventListener('unlock', () => {
+            // 如果不是因为打开背包导致的解锁（比如按了 Esc），也要确保 UI 状态同步
+            if (!this.isInventoryOpen) {
+                this.inventoryUI.toggle(false);
+            }
+        });
+    }
+
+    private updateHand() {
+        const selected = this.inventory.getSelectedSlot();
+        this.hand.setBlock(selected ? selected.type : BlockType.AIR);
     }
 
     public spawn(x: number, y: number, z: number) {
@@ -76,6 +107,8 @@ export class Player {
     }
 
     private onMouseDown(event: MouseEvent) {
+        if (this.isInventoryOpen) return;
+
         if (!this.controls.isLocked) {
             this.controls.lock();
             return;
@@ -88,12 +121,29 @@ export class Player {
     }
 
     private onWheel(event: WheelEvent) {
+        if (this.isInventoryOpen) return;
+        
         if (event.deltaY > 0) this.inventory.next();
         else this.inventory.prev();
-        this.hand.setBlock(this.inventory.getSelectedBlock());
+        
+        this.updateHand();
+        this.inventoryUI.update();
+    }
+
+    private toggleInventory() {
+        this.isInventoryOpen = !this.isInventoryOpen;
+        if (this.isInventoryOpen) {
+            this.controls.unlock();
+            this.inventoryUI.toggle(true);
+        } else {
+            this.controls.lock();
+            this.inventoryUI.toggle(false);
+        }
     }
 
     private onKeyDown(event: KeyboardEvent) {
+        if (this.isInventoryOpen && event.code !== 'KeyE' && event.code !== 'Escape') return;
+
         switch (event.code) {
             case 'KeyW': this.moveForward = true; break;
             case 'KeyS': this.moveBackward = true; break;
@@ -106,20 +156,25 @@ export class Player {
                 }
                 break;
             case 'KeyE':
+                this.toggleInventory();
+                break;
+            case 'KeyR':
+                this.hand.swing();
                 this.placeBlock();
                 break;
             case 'KeyF':
                 this.hand.swing();
                 this.destroyBlock();
                 break;
-            case 'KeyR':
-                this.inventory.next();
-                this.hand.setBlock(this.inventory.getSelectedBlock());
-                this.audioManager.play('place'); // 切换材质时播放一个提示音
-                break;
-            case 'Digit1': this.inventory.select(0); this.hand.setBlock(this.inventory.getSelectedBlock()); break;
-            case 'Digit2': this.inventory.select(1); this.hand.setBlock(this.inventory.getSelectedBlock()); break;
-            case 'Digit3': this.inventory.select(2); this.hand.setBlock(this.inventory.getSelectedBlock()); break;
+            case 'Digit1': this.selectSlot(0); break;
+            case 'Digit2': this.selectSlot(1); break;
+            case 'Digit3': this.selectSlot(2); break;
+            case 'Digit4': this.selectSlot(3); break;
+            case 'Digit5': this.selectSlot(4); break;
+            case 'Digit6': this.selectSlot(5); break;
+            case 'Digit7': this.selectSlot(6); break;
+            case 'Digit8': this.selectSlot(7); break;
+            case 'Digit9': this.selectSlot(8); break;
             case 'KeyC':
                 this.isThirdPerson = !this.isThirdPerson;
                 break;
@@ -128,6 +183,13 @@ export class Player {
             case 'KeyJ': this.lookLeft = true; break;
             case 'KeyL': this.lookRight = true; break;
         }
+    }
+
+    private selectSlot(index: number) {
+        this.inventory.select(index);
+        this.updateHand();
+        this.inventoryUI.update();
+        this.audioManager.play('place'); 
     }
 
     private onKeyUp(event: KeyboardEvent) {
@@ -146,18 +208,25 @@ export class Player {
     private destroyBlock() {
         const hit = this.selectionBox.update();
         if (hit) {
-            this.world.setVoxel(hit.position.x, hit.position.y, hit.position.z, BlockType.AIR);
-            this.audioManager.play('break');
+            const blockType = this.world.getVoxel(hit.position.x, hit.position.y, hit.position.z);
+            if (blockType !== BlockType.AIR) {
+                // Spawn drop BEFORE setting to AIR
+                this.entityManager.spawnDrop(blockType, hit.position.clone().add(new THREE.Vector3(0.5, 0.5, 0.5)));
+                this.world.setVoxel(hit.position.x, hit.position.y, hit.position.z, BlockType.AIR);
+                this.audioManager.play('break');
+            }
         }
     }
 
     private placeBlock() {
+        const selected = this.inventory.getSelectedSlot();
+        if (!selected || selected.count <= 0) return;
+
         const hit = this.selectionBox.update();
         if (hit) {
             const placePos = hit.position.clone().add(hit.normal);
             
             // 碰撞检测：防止在玩家自己身体所在位置放置方块
-            // 玩家高度 1.8，占据两个垂直方块
             const playerX = Math.floor(this.position.x);
             const playerZ = Math.floor(this.position.z);
             const playerY_low = Math.floor(this.position.y);
@@ -168,15 +237,27 @@ export class Player {
                 return;
             }
             
-            this.world.setVoxel(placePos.x, placePos.y, placePos.z, this.inventory.getSelectedBlock());
+            this.world.setVoxel(placePos.x, placePos.y, placePos.z, selected.type);
+            this.inventory.consumeSelected(1);
+            this.inventoryUI.update();
+            
+            // Update hand if item ran out
+            this.updateHand();
+            
             this.audioManager.play('place');
         }
     }
 
     public update(delta: number) {
+        this.entityManager.update(delta, this.position, this.inventory);
         this.selectionBox.update();
 
-        if (!this.controls.isLocked) {
+        if (!this.controls.isLocked && !this.isInventoryOpen) {
+            this.hand.update(delta, false);
+            return;
+        }
+
+        if (this.isInventoryOpen) {
             this.hand.update(delta, false);
             return;
         }
