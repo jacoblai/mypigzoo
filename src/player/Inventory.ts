@@ -15,14 +15,7 @@ export class Inventory {
     private selectedIndex: number = 0;
 
     constructor() {
-        // Initial items for testing
-        this.slots[0] = { type: BlockType.GRASS, count: 64 };
-        this.slots[1] = { type: BlockType.DIRT, count: 64 };
-        this.slots[2] = { type: BlockType.STONE, count: 64 };
-        this.slots[3] = { type: BlockType.OAK_LOG, count: 64 };
-        this.slots[4] = { type: BlockType.OAK_LEAVES, count: 64 };
-        this.slots[5] = { type: BlockType.GLASS, count: 64 };
-        this.slots[6] = { type: BlockType.DIAMOND_ORE, count: 64 };
+        // Start with an empty inventory
     }
 
     public getSelectedSlot(): InventoryItem | null {
