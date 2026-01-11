@@ -195,6 +195,41 @@ export class Player {
         const oldPos = this.position.clone();
         const result = Physics.collide(this.world, this.position, this.velocity, delta);
         
+        // 自动跳跃逻辑：当玩家在地面移动但水平速度被阻挡时，检查是否可以自动跳上台阶
+        if (result.isGrounded && (this.moveForward || this.moveBackward || this.moveLeft || this.moveRight)) {
+            const isHorizontalBlocked = 
+                (Math.abs(this.velocity.x) > 0.1 && Math.abs(result.velocity.x) < 0.01) ||
+                (Math.abs(this.velocity.z) > 0.1 && Math.abs(result.velocity.z) < 0.01);
+            
+            if (isHorizontalBlocked) {
+                // 计算移动方向
+                const moveDir = new THREE.Vector3();
+                const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                f.y = 0; f.normalize();
+                const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0));
+                
+                if (this.moveForward) moveDir.add(f);
+                if (this.moveBackward) moveDir.add(f.clone().negate());
+                if (this.moveLeft) moveDir.add(r.clone().negate());
+                if (this.moveRight) moveDir.add(r);
+                moveDir.normalize();
+
+                // 检查前方是否有 1 格高的障碍物
+                const checkDist = 0.5;
+                const checkX = this.position.x + moveDir.x * checkDist;
+                const checkZ = this.position.z + moveDir.z * checkDist;
+                
+                const kneeBlock = this.world.getVoxel(checkX, this.position.y + 0.5, checkZ);
+                const headBlock = this.world.getVoxel(checkX, this.position.y + 1.5, checkZ);
+                
+                // 如果前方脚下有方块且头顶没方块，则执行跳跃
+                if (kneeBlock !== BlockType.AIR && headBlock === BlockType.AIR) {
+                    result.velocity.y = 8.5; 
+                    result.isGrounded = false;
+                }
+            }
+        }
+
         this.position.copy(result.position);
         this.velocity.copy(result.velocity);
         this.canJump = result.isGrounded;
