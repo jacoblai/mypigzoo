@@ -17,8 +17,8 @@ export class TextureManager {
             this.material = new THREE.MeshLambertMaterial({
                 map: this.texture,
                 transparent: true,
-                alphaTest: 0.1,
-                side: THREE.DoubleSide // Important for CROSS render type
+                alphaTest: 0.01, // 降低阈值以允许半透明水体渲染
+                side: THREE.DoubleSide
             });
         }
         return this.material;
@@ -130,6 +130,14 @@ export class TextureManager {
         drawCross(7, 2, '#4aad31'); // Tall Grass
         drawCross(13, 0, '#fdd835'); // Dandelion
         drawCross(12, 0, '#e53935'); // Rose
+
+        // Water (14, 0)
+        const waterPattern = getNoisePattern();
+        drawTile(14, 0, [
+            'rgba(63, 118, 228, 0.7)', 
+            'rgba(66, 135, 245, 0.7)', 
+            'rgba(50, 100, 200, 0.7)'
+        ], waterPattern);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

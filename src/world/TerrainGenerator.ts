@@ -4,6 +4,7 @@ import { BlockType } from './Block';
 
 export class TerrainGenerator {
     private noise2D = createNoise2D();
+    private static readonly SEA_LEVEL = 12;
 
     public generateChunk(chunk: Chunk) {
         const cx = chunk.position.x;
@@ -41,11 +42,11 @@ export class TerrainGenerator {
                         chunk.setVoxel(x, y, z, type);
                     } else if (worldY < height - 1) {
                         // Subsurface: Dirt or Sand
-                        const isBeach = height < 12;
+                        const isBeach = height < TerrainGenerator.SEA_LEVEL + 2;
                         chunk.setVoxel(x, y, z, isBeach ? BlockType.SAND : BlockType.DIRT);
                     } else if (worldY === height - 1) {
                         // Surface: Grass, Sand, or Gravel
-                        const isBeach = height < 12;
+                        const isBeach = height < TerrainGenerator.SEA_LEVEL + 2;
                         const surfaceType = isBeach ? (Math.random() > 0.1 ? BlockType.SAND : BlockType.GRAVEL) : BlockType.GRASS;
                         chunk.setVoxel(x, y, z, surfaceType);
 
@@ -62,6 +63,11 @@ export class TerrainGenerator {
                             } else if (deco < 0.1) {
                                 chunk.setVoxel(x, y + 1, z, BlockType.ROSE);
                             }
+                        }
+                    } else if (worldY < TerrainGenerator.SEA_LEVEL) {
+                        // Water filling
+                        if (chunk.getVoxel(x, y, z) === BlockType.AIR) {
+                            chunk.setVoxel(x, y, z, BlockType.WATER);
                         }
                     }
                 }

@@ -31,6 +31,9 @@ export enum BlockType {
     TALL_GRASS = 40,
     DANDELION = 41,
     ROSE = 42,
+
+    // Fluids
+    WATER = 50,
 }
 
 export enum RenderType {
@@ -205,6 +208,14 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         isSolid: false,
         hardness: 0,
         textures: { all: [12, 0] }
+    },
+    [BlockType.WATER]: {
+        name: 'Water',
+        renderType: RenderType.TRANSPARENT,
+        isOpaque: false,
+        isSolid: false,
+        hardness: 100, // Unbreakable but not solid
+        textures: { all: [14, 0] }
     },
 };
 

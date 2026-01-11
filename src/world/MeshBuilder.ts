@@ -49,28 +49,31 @@ export class MeshBuilder {
                         const neighborType = getVoxel(nx, ny, nz);
                         const neighbor = BLOCK_DATA[neighborType];
 
-                        // Face Culling Logic:
-                        // Show face if:
-                        // 1. Neighbor is AIR
-                        // 2. Neighbor is transparent/leaves AND current block is different
-                        // 3. Current block is transparent, only show if neighbor is AIR or different transparent block
+                        // Face Culling Logic (Minecraft-like):
                         let showFace = false;
                         if (neighborType === BlockType.AIR) {
                             showFace = true;
                         } else if (neighbor) {
-                            if (!neighbor.isOpaque) {
-                                if (block.isOpaque) {
-                                    showFace = true;
-                                } else {
-                                    // Both transparent - show face if they are different (e.g. glass next to water)
-                                    showFace = blockType !== neighborType;
-                                }
+                            if (block.isOpaque) {
+                                // Opaque blocks show face if neighbor is not opaque
+                                showFace = !neighbor.isOpaque;
+                            } else {
+                                // Transparent blocks (water, glass) show face if neighbor is a different block type
+                                // This ensures water shows its face against stone, but not against other water
+                                showFace = blockType !== neighborType;
                             }
                         }
 
                         if (showFace) {
                             const texCoords = block.textures.all || (block.textures as any)[face] || block.textures.side;
-                            this.addFace(x, y, z, corners, normal, texCoords, positions, normals, uvs, indices, vertexCount, TILE_SIZE);
+                            
+                            // Minecraft water trick: Lower the surface of water blocks
+                            let finalCorners = corners;
+                            if (blockType === BlockType.WATER) {
+                                finalCorners = corners.map(c => [c[0], c[1] === 1 ? 0.9 : c[1], c[2]]);
+                            }
+
+                            this.addFace(x, y, z, finalCorners, normal, texCoords, positions, normals, uvs, indices, vertexCount, TILE_SIZE);
                             vertexCount += 4;
                         }
                     }
