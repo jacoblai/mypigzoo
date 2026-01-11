@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../world/World';
+import { BlockType, BLOCK_DATA } from '../world/Block';
 
 export interface PhysicsResult {
     position: THREE.Vector3;
@@ -68,8 +69,12 @@ export class Physics {
         ];
 
         for (const [ox, oy, oz] of offsets) {
-            if (world.getVoxel(pos.x + ox, pos.y + oy, pos.z + oz) !== 0) {
-                return true;
+            const voxel = world.getVoxel(pos.x + ox, pos.y + oy, pos.z + oz);
+            if (voxel !== BlockType.AIR) {
+                const blockData = BLOCK_DATA[voxel];
+                if (blockData && blockData.isSolid) {
+                    return true;
+                }
             }
         }
         return false;

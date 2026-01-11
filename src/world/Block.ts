@@ -44,6 +44,7 @@ export interface BlockData {
     name: string;
     renderType: RenderType;
     isOpaque: boolean;
+    isSolid: boolean; // 新增：是否具有物理碰撞
     hardness: number;
     // Texture coordinates in the 16x16 grid [x, y]
     textures: {
@@ -62,6 +63,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Stone',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 1.5,
         textures: { all: [3, 0] }
     },
@@ -69,6 +71,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Cobblestone',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 2.0,
         textures: { all: [0, 1] }
     },
@@ -76,6 +79,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Grass',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 0.6,
         textures: { top: [0, 0], bottom: [2, 0], side: [1, 0] },
         isEdible: true,
@@ -86,6 +90,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Dirt',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 0.5,
         textures: { all: [2, 0] }
     },
@@ -93,6 +98,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Sand',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 0.5,
         textures: { all: [2, 1] }
     },
@@ -100,6 +106,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Gravel',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 0.6,
         textures: { all: [3, 1] }
     },
@@ -107,6 +114,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Bedrock',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: -1, // Unbreakable
         textures: { all: [1, 1] }
     },
@@ -114,6 +122,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Oak Log',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 2.0,
         textures: { top: [5, 1], bottom: [5, 1], side: [4, 1] }
     },
@@ -121,6 +130,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Oak Leaves',
         renderType: RenderType.LEAVES,
         isOpaque: false,
+        isSolid: true,
         hardness: 0.2,
         textures: { all: [4, 3] }
     },
@@ -128,6 +138,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Coal Ore',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 3.0,
         textures: { all: [2, 2] }
     },
@@ -135,6 +146,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Iron Ore',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 3.0,
         textures: { all: [1, 2] }
     },
@@ -142,6 +154,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Gold Ore',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 3.0,
         textures: { all: [0, 2] }
     },
@@ -149,6 +162,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Diamond Ore',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 3.0,
         textures: { all: [2, 3] }
     },
@@ -156,6 +170,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Planks',
         renderType: RenderType.CUBE,
         isOpaque: true,
+        isSolid: true,
         hardness: 2.0,
         textures: { all: [4, 0] }
     },
@@ -163,6 +178,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Glass',
         renderType: RenderType.TRANSPARENT,
         isOpaque: false,
+        isSolid: true,
         hardness: 0.3,
         textures: { all: [1, 3] }
     },
@@ -170,6 +186,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Tall Grass',
         renderType: RenderType.CROSS,
         isOpaque: false,
+        isSolid: false,
         hardness: 0,
         textures: { all: [7, 2] }
     },
@@ -177,6 +194,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Dandelion',
         renderType: RenderType.CROSS,
         isOpaque: false,
+        isSolid: false,
         hardness: 0,
         textures: { all: [13, 0] }
     },
@@ -184,6 +202,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         name: 'Rose',
         renderType: RenderType.CROSS,
         isOpaque: false,
+        isSolid: false,
         hardness: 0,
         textures: { all: [12, 0] }
     },

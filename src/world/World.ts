@@ -8,6 +8,7 @@ export class World {
     private generator: TerrainGenerator;
     
     public renderDistance = 4;
+    public renderDistanceY = 2; // Support vertical chunks
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -28,12 +29,13 @@ export class World {
         // 1. Identify chunks that should be loaded
         for (let x = px - this.renderDistance; x <= px + this.renderDistance; x++) {
             for (let z = pz - this.renderDistance; z <= pz + this.renderDistance; z++) {
-                const y = 0; 
-                const key = this.getChunkKey(x, y, z);
-                currentChunkKeys.add(key);
+                for (let y = py - this.renderDistanceY; y <= py + this.renderDistanceY; y++) {
+                    const key = this.getChunkKey(x, y, z);
+                    currentChunkKeys.add(key);
 
-                if (!this.chunks.has(key)) {
-                    this.loadChunk(x, y, z);
+                    if (!this.chunks.has(key)) {
+                        this.loadChunk(x, y, z);
+                    }
                 }
             }
         }
@@ -65,10 +67,12 @@ export class World {
 
     private updateChunkAndNeighbors(cx: number, cy: number, cz: number) {
         for (let x = cx - 1; x <= cx + 1; x++) {
-            for (let z = cz - 1; z <= cz + 1; z++) {
-                const key = this.getChunkKey(x, cy, z);
-                if (this.chunks.has(key)) {
-                    this.updateChunkMesh(x * Chunk.SIZE, cy * Chunk.SIZE, z * Chunk.SIZE);
+            for (let y = cy - 1; y <= cy + 1; y++) {
+                for (let z = cz - 1; z <= cz + 1; z++) {
+                    const key = this.getChunkKey(x, y, z);
+                    if (this.chunks.has(key)) {
+                        this.updateChunkMesh(x * Chunk.SIZE, y * Chunk.SIZE, z * Chunk.SIZE);
+                    }
                 }
             }
         }

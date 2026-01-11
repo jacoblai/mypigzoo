@@ -8,8 +8,8 @@ if (container) {
     const world = new World(engine.scene);
     const player = new Player(engine.camera, container, engine.scene, world);
 
-    // 使用统一的 Spawn 方法设置初始位置 (x=8, y=20, z=8)
-    player.spawn(8, 20, 8);
+    // 在 Spawn 前无需手动 update，spawn 内部已包含逻辑
+    player.spawn(8, 32, 8);
 
     // Register update loop
     engine.addUpdateCallback((delta) => {

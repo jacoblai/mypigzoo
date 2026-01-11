@@ -1,21 +1,22 @@
 import * as THREE from 'three';
+import { EnvironmentSystem } from './EnvironmentSystem';
 
 export class CoreEngine {
     public scene: THREE.Scene;
     public camera: THREE.PerspectiveCamera;
     public renderer: THREE.WebGLRenderer;
     private clock: THREE.Clock;
+    private environment: EnvironmentSystem;
     private onUpdateCallbacks: ((delta: number) => void)[] = [];
 
     constructor(container: HTMLElement) {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
 
         this.camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
             0.1,
-            1000
+            2000 // Increased far plane for celestial bodies
         );
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -25,17 +26,8 @@ export class CoreEngine {
 
         this.clock = new THREE.Clock();
 
-        this.initLights();
+        this.environment = new EnvironmentSystem(this.scene);
         window.addEventListener('resize', () => this.onWindowResize());
-    }
-
-    private initLights() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        this.scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(10, 20, 10);
-        this.scene.add(directionalLight);
     }
 
     private onWindowResize() {
@@ -51,6 +43,10 @@ export class CoreEngine {
     public start() {
         this.renderer.setAnimationLoop(() => {
             const delta = this.clock.getDelta();
+            
+            // Update environment (Day/Night cycle)
+            this.environment.update(delta, this.camera.position);
+
             for (const callback of this.onUpdateCallbacks) {
                 callback(delta);
             }
