@@ -42,6 +42,8 @@ export class Player {
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement, scene: THREE.Scene, world: World) {
         this.world = world;
         this.camera = camera;
+        // 设置旋转顺序为 YXZ，防止键盘控制时视角产生 Roll 轴倾斜（“躺下”感）
+        this.camera.rotation.order = 'YXZ';
         
         this.controls = new PointerLockControls(camera, domElement);
         this.selectionBox = new SelectionBox(scene, world, camera);
@@ -179,12 +181,17 @@ export class Player {
             return;
         }
 
-        // 0. 处理键盘视角旋转 (I J K L)
+        // 0. 处理键盘视角旋转 (I J K L) - 采用互斥逻辑防止视角倾斜
         const lookSpeed = 2.0;
-        if (this.lookUp) this.camera.rotation.x += lookSpeed * delta;
-        if (this.lookDown) this.camera.rotation.x -= lookSpeed * delta;
-        if (this.lookLeft) this.camera.rotation.y += lookSpeed * delta;
-        if (this.lookRight) this.camera.rotation.y -= lookSpeed * delta;
+        if (this.lookUp) {
+            this.camera.rotation.x += lookSpeed * delta;
+        } else if (this.lookDown) {
+            this.camera.rotation.x -= lookSpeed * delta;
+        } else if (this.lookLeft) {
+            this.camera.rotation.y += lookSpeed * delta;
+        } else if (this.lookRight) {
+            this.camera.rotation.y -= lookSpeed * delta;
+        }
         
         // 限制仰角，防止翻转
         this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));

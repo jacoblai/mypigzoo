@@ -17,23 +17,27 @@ export class AudioManager {
      */
     public async init() {
         // Create simple procedural sounds using AudioContext
-        this.createProceduralSound('break', 0.1, [150, 50], 'noise');
-        this.createProceduralSound('place', 0.05, [200, 300], 'sine');
-        this.createProceduralSound('step', 0.05, [100, 40], 'noise');
+        this.createProceduralSound('break', 0.1, [150, 50], 'noise', 0.3);
+        this.createProceduralSound('place', 0.05, [200, 300], 'sine', 0.2);
+        // 走路声效：稍微延长一点，配合低通滤波会更沉闷（不刺耳），音量也调小一点
+        this.createProceduralSound('step', 0.08, [100, 40], 'noise', 0.15);
     }
 
-    private createProceduralSound(name: string, duration: number, freqRange: [number, number], type: 'noise' | 'sine') {
+    private createProceduralSound(name: string, duration: number, freqRange: [number, number], type: 'noise' | 'sine', volume: number = 0.3) {
         const ctx = THREE.AudioContext.getContext();
         const sampleRate = ctx.sampleRate;
         const frameCount = sampleRate * duration;
         const buffer = ctx.createBuffer(1, frameCount, sampleRate);
         const data = buffer.getChannelData(0);
 
+        let lastOut = 0;
         for (let i = 0; i < frameCount; i++) {
             const t = i / frameCount;
             if (type === 'noise') {
-                // Brown/White noise-like for break/step
-                data[i] = (Math.random() * 2 - 1) * (1 - t);
+                // 使用简单的低通滤波（平滑处理）使噪声不那么刺耳，更接近“闷响”
+                const white = (Math.random() * 2 - 1);
+                lastOut = lastOut * 0.85 + white * 0.15;
+                data[i] = lastOut * (1 - t);
             } else {
                 // Pitch shift for place
                 const freq = freqRange[0] + (freqRange[1] - freqRange[0]) * t;
@@ -43,7 +47,7 @@ export class AudioManager {
 
         const audio = new THREE.Audio(this.listener);
         audio.setBuffer(buffer);
-        audio.setVolume(0.3);
+        audio.setVolume(volume);
         this.sounds.set(name, audio);
     }
 
