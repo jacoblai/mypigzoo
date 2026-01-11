@@ -21,6 +21,8 @@ export class AudioManager {
         this.createProceduralSound('place', 0.05, [200, 300], 'sine', 0.2);
         // 走路声效：稍微延长一点，配合低通滤波会更沉闷（不刺耳），音量也调小一点
         this.createProceduralSound('step', 0.08, [100, 40], 'noise', 0.15);
+        // 受伤声效：低促的打击感
+        this.createProceduralSound('hurt', 0.15, [80, 40], 'noise', 0.5);
     }
 
     private createProceduralSound(name: string, duration: number, freqRange: [number, number], type: 'noise' | 'sine', volume: number = 0.3) {

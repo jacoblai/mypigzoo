@@ -12,12 +12,18 @@ export const BLOCK_TEXTURES: Record<number, {
     top?: [number, number],
     bottom?: [number, number],
     side?: [number, number],
+    isEdible?: boolean,
+    nutrition?: number,
+    saturation?: number,
 }> = {
     [BlockType.DIRT]: { all: [2, 0] },
     [BlockType.GRASS]: {
         top: [0, 0],
         bottom: [2, 0],
-        side: [1, 0]
+        side: [1, 0],
+        isEdible: true, // For testing purposes, grass is edible
+        nutrition: 2,
+        saturation: 1.2
     },
     [BlockType.STONE]: { all: [3, 0] },
 };

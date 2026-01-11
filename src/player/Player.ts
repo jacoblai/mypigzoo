@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { World } from '../world/World';
 import { SelectionBox } from './SelectionBox';
-import { BlockType } from '../world/Block';
+import { BlockType, BLOCK_TEXTURES } from '../world/Block';
 import { Physics } from '../utils/Physics';
 import { Inventory } from './Inventory';
 import { Hand } from './Hand';
@@ -11,12 +11,16 @@ import { AudioManager } from '../core/AudioManager';
 import { EntityManager } from '../world/EntityManager';
 import { InventoryUI } from './InventoryUI';
 
+import { PlayerStats } from './PlayerStats';
+import { StatsUI } from './StatsUI';
+
 export class Player {
     private controls: PointerLockControls;
     private camera: THREE.PerspectiveCamera;
     
     public position: THREE.Vector3 = new THREE.Vector3(); 
     public velocity: THREE.Vector3 = new THREE.Vector3();
+    private lastVelocityY: number = 0;
     
     private moveForward = false;
     private moveBackward = false;
@@ -32,6 +36,8 @@ export class Player {
     private selectionBox: SelectionBox;
     private inventory: Inventory;
     private inventoryUI: InventoryUI;
+    private stats: PlayerStats;
+    private statsUI: StatsUI;
     private hand: Hand;
     private characterModel: CharacterModel;
     private audioManager: AudioManager;
@@ -54,6 +60,14 @@ export class Player {
         this.selectionBox = new SelectionBox(scene, world, camera);
         this.inventory = new Inventory();
         this.inventoryUI = new InventoryUI(this.inventory);
+        this.stats = new PlayerStats();
+        this.statsUI = new StatsUI(this.stats);
+        
+        // 订阅伤害事件播放声效
+        this.stats.onDamage = () => {
+            this.audioManager.play('hurt');
+        };
+
         this.hand = new Hand();
         this.characterModel = new CharacterModel();
         
@@ -116,8 +130,14 @@ export class Player {
         
         this.hand.swing();
 
-        if (event.button === 0) this.destroyBlock();
-        if (event.button === 2) this.placeBlock();
+        // 兼容 macOS: Ctrl + 左键 视为右键
+        const isRightClick = event.button === 2 || (event.button === 0 && event.ctrlKey);
+
+        if (isRightClick) {
+            this.placeBlock();
+        } else if (event.button === 0) {
+            this.destroyBlock();
+        }
     }
 
     private onWheel(event: WheelEvent) {
@@ -153,6 +173,7 @@ export class Player {
                 if (this.canJump) {
                     this.velocity.y = 8.5; 
                     this.canJump = false;
+                    this.stats.addExhaustion(0.05); // 跳跃消耗
                 }
                 break;
             case 'KeyE':
@@ -214,6 +235,10 @@ export class Player {
                 this.entityManager.spawnDrop(blockType, hit.position.clone().add(new THREE.Vector3(0.5, 0.5, 0.5)));
                 this.world.setVoxel(hit.position.x, hit.position.y, hit.position.z, BlockType.AIR);
                 this.audioManager.play('break');
+                
+                // 增加经验值和精疲力竭度
+                this.stats.addExperience(1);
+                this.stats.addExhaustion(0.005);
             }
         }
     }
@@ -221,6 +246,17 @@ export class Player {
     private placeBlock() {
         const selected = this.inventory.getSelectedSlot();
         if (!selected || selected.count <= 0) return;
+
+        // 饮食逻辑优先
+        const blockData = (BLOCK_TEXTURES as any)[selected.type];
+        if (blockData?.isEdible && this.stats.hunger < 20) {
+            this.stats.eat(blockData.nutrition || 1, blockData.saturation || 0.5);
+            this.inventory.consumeSelected(1);
+            this.inventoryUI.update();
+            this.updateHand();
+            this.audioManager.play('step'); // 暂时用 step 音效代替吃东西
+            return;
+        }
 
         const hit = this.selectionBox.update();
         if (hit) {
@@ -251,6 +287,10 @@ export class Player {
     public update(delta: number) {
         this.entityManager.update(delta, this.position, this.inventory);
         this.selectionBox.update();
+
+        // 更新状态逻辑
+        this.stats.update(delta);
+        this.statsUI.update();
 
         if (!this.controls.isLocked && !this.isInventoryOpen) {
             this.hand.update(delta, false);
@@ -289,6 +329,9 @@ export class Player {
             this.velocity.y = -0.1;
         }
 
+        // 记录更新前的垂直速度用于计算坠落伤害
+        this.lastVelocityY = this.velocity.y;
+
         // 2. 输入转换为速度
         const moveSpeed = 45.0;
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -305,6 +348,16 @@ export class Player {
         const oldPos = this.position.clone();
         const result = Physics.collide(this.world, this.position, this.velocity, delta);
         
+        // 坠落伤害检测
+        if (result.isGrounded && !this.canJump) {
+            if (this.lastVelocityY < -13) {
+                const damage = Math.floor((Math.abs(this.lastVelocityY) - 12) * 1.5);
+                if (damage > 0) {
+                    this.stats.damage(damage);
+                }
+            }
+        }
+
         // 自动跳跃逻辑：当玩家在地面移动但水平速度被阻挡时，检查是否可以自动跳上台阶
         if (result.isGrounded && (this.moveForward || this.moveBackward || this.moveLeft || this.moveRight)) {
             const isHorizontalBlocked = 
@@ -336,6 +389,7 @@ export class Player {
                 if (kneeBlock !== BlockType.AIR && headBlock === BlockType.AIR) {
                     result.velocity.y = 8.5; 
                     result.isGrounded = false;
+                    this.stats.addExhaustion(0.05);
                 }
             }
         }
@@ -353,6 +407,10 @@ export class Player {
         if (isActuallyMoving) {
             this.walkTime += delta;
             this.stepTimer += delta;
+            
+            // 运动消耗
+            this.stats.addExhaustion(actualHorizontalDist * 0.1);
+
             if (this.stepTimer >= this.STEP_INTERVAL) {
                 this.audioManager.play('step');
                 this.stepTimer = 0;
