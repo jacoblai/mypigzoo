@@ -279,8 +279,10 @@ export class Player {
         }
 
         // Progress mining
-        const blockData = (BLOCK_DATA as any)[voxel];
+        const blockData = BLOCK_DATA[voxel];
         const hardness = blockData?.hardness ?? 0.2;
+        
+        if (hardness < 0) return; // Bedrock or unbreakable
         
         this.miningProgress += delta;
 
@@ -312,7 +314,7 @@ export class Player {
         if (!selected || selected.count <= 0) return;
 
         // 饮食逻辑优先
-        const blockData = (BLOCK_DATA as any)[selected.type];
+        const blockData = BLOCK_DATA[selected.type];
         if (blockData?.isEdible && this.stats.hunger < 20) {
             this.stats.eat(blockData.nutrition || 1, blockData.saturation || 0.5);
             this.inventory.consumeSelected(1);

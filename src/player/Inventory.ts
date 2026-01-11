@@ -17,8 +17,12 @@ export class Inventory {
     constructor() {
         // Initial items for testing
         this.slots[0] = { type: BlockType.GRASS, count: 64 };
-        this.slots[1] = { type: BlockType.DIRT, count: 32 };
-        this.slots[2] = { type: BlockType.STONE, count: 16 };
+        this.slots[1] = { type: BlockType.DIRT, count: 64 };
+        this.slots[2] = { type: BlockType.STONE, count: 64 };
+        this.slots[3] = { type: BlockType.OAK_LOG, count: 64 };
+        this.slots[4] = { type: BlockType.OAK_LEAVES, count: 64 };
+        this.slots[5] = { type: BlockType.GLASS, count: 64 };
+        this.slots[6] = { type: BlockType.DIAMOND_ORE, count: 64 };
     }
 
     public getSelectedSlot(): InventoryItem | null {

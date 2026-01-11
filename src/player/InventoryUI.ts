@@ -46,6 +46,7 @@ export class InventoryUI {
                 background-image: url('${atlasURL}');
                 background-size: 640px 640px; 
                 pointer-events: none;
+                background-repeat: no-repeat;
             }
             .item-count {
                 position: absolute;
@@ -208,7 +209,7 @@ export class InventoryUI {
             const texData = BLOCK_TEXTURES[item.type];
             if (texData) {
                 // Use side texture for icon, or all if not available
-                const uv = texData.side || texData.all || [0, 0];
+                const uv = texData.textures.side || texData.textures.all || [0, 0];
                 const x = uv[0] * 40;
                 const y = uv[1] * 40;
                 itemEl.style.backgroundPosition = `-${x}px -${y}px`;

@@ -1,47 +1,193 @@
 export enum BlockType {
     AIR = 0,
-    DIRT = 1,
-    GRASS = 2,
-    STONE = 3,
+    
+    // Natural Blocks
+    STONE = 1,
+    COBBLESTONE = 2,
+    GRASS = 3,
+    DIRT = 4,
+    SAND = 5,
+    GRAVEL = 6,
+    BEDROCK = 7,
+    
+    // Wood & Leaves
+    OAK_LOG = 10,
+    OAK_LEAVES = 11,
+    BIRCH_LOG = 12,
+    BIRCH_LEAVES = 13,
+    
+    // Ores
+    COAL_ORE = 20,
+    IRON_ORE = 21,
+    GOLD_ORE = 22,
+    DIAMOND_ORE = 23,
+    
+    // Building Blocks
+    PLANKS = 30,
+    GLASS = 31,
+    BRICKS = 32,
+    
+    // Decoration
+    TALL_GRASS = 40,
+    DANDELION = 41,
+    ROSE = 42,
 }
 
-// UV mapping for a 16x16 atlas (grid coordinates 0-15)
-// Each face can have a different texture
-export const BLOCK_DATA: Record<number, {
-    all?: [number, number],
-    top?: [number, number],
-    bottom?: [number, number],
-    side?: [number, number],
-    isEdible?: boolean,
-    nutrition?: number,
-    saturation?: number,
-    hardness: number, // Time in seconds to break with bare hands
-}> = {
-    [BlockType.DIRT]: { 
-        all: [2, 0],
-        hardness: 0.5
+export enum RenderType {
+    CUBE = 0,
+    TRANSPARENT = 1, // Full cube but transparent (e.g. glass)
+    CROSS = 2,       // Two intersecting planes (e.g. grass, flowers)
+    LEAVES = 3,      // Special rendering for leaves (culling behavior)
+}
+
+export interface BlockData {
+    name: string;
+    renderType: RenderType;
+    isOpaque: boolean;
+    hardness: number;
+    // Texture coordinates in the 16x16 grid [x, y]
+    textures: {
+        all?: [number, number];
+        top?: [number, number];
+        bottom?: [number, number];
+        side?: [number, number];
+    };
+    isEdible?: boolean;
+    nutrition?: number;
+    saturation?: number;
+}
+
+export const BLOCK_DATA: Record<number, BlockData> = {
+    [BlockType.STONE]: {
+        name: 'Stone',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 1.5,
+        textures: { all: [3, 0] }
+    },
+    [BlockType.COBBLESTONE]: {
+        name: 'Cobblestone',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 2.0,
+        textures: { all: [0, 1] }
     },
     [BlockType.GRASS]: {
-        top: [0, 0],
-        bottom: [2, 0],
-        side: [1, 0],
-        isEdible: true, // For testing purposes, grass is edible
+        name: 'Grass',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 0.6,
+        textures: { top: [0, 0], bottom: [2, 0], side: [1, 0] },
+        isEdible: true,
         nutrition: 2,
-        saturation: 1.2,
-        hardness: 0.6
+        saturation: 1.2
     },
-    [BlockType.STONE]: { 
-        all: [3, 0],
-        hardness: 2.0
+    [BlockType.DIRT]: {
+        name: 'Dirt',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 0.5,
+        textures: { all: [2, 0] }
+    },
+    [BlockType.SAND]: {
+        name: 'Sand',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 0.5,
+        textures: { all: [2, 1] }
+    },
+    [BlockType.GRAVEL]: {
+        name: 'Gravel',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 0.6,
+        textures: { all: [3, 1] }
+    },
+    [BlockType.BEDROCK]: {
+        name: 'Bedrock',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: -1, // Unbreakable
+        textures: { all: [1, 1] }
+    },
+    [BlockType.OAK_LOG]: {
+        name: 'Oak Log',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 2.0,
+        textures: { top: [5, 1], bottom: [5, 1], side: [4, 1] }
+    },
+    [BlockType.OAK_LEAVES]: {
+        name: 'Oak Leaves',
+        renderType: RenderType.LEAVES,
+        isOpaque: false,
+        hardness: 0.2,
+        textures: { all: [4, 3] }
+    },
+    [BlockType.COAL_ORE]: {
+        name: 'Coal Ore',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 3.0,
+        textures: { all: [2, 2] }
+    },
+    [BlockType.IRON_ORE]: {
+        name: 'Iron Ore',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 3.0,
+        textures: { all: [1, 2] }
+    },
+    [BlockType.GOLD_ORE]: {
+        name: 'Gold Ore',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 3.0,
+        textures: { all: [0, 2] }
+    },
+    [BlockType.DIAMOND_ORE]: {
+        name: 'Diamond Ore',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 3.0,
+        textures: { all: [2, 3] }
+    },
+    [BlockType.PLANKS]: {
+        name: 'Planks',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        hardness: 2.0,
+        textures: { all: [4, 0] }
+    },
+    [BlockType.GLASS]: {
+        name: 'Glass',
+        renderType: RenderType.TRANSPARENT,
+        isOpaque: false,
+        hardness: 0.3,
+        textures: { all: [1, 3] }
+    },
+    [BlockType.TALL_GRASS]: {
+        name: 'Tall Grass',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        hardness: 0,
+        textures: { all: [7, 2] }
+    },
+    [BlockType.DANDELION]: {
+        name: 'Dandelion',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        hardness: 0,
+        textures: { all: [13, 0] }
+    },
+    [BlockType.ROSE]: {
+        name: 'Rose',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        hardness: 0,
+        textures: { all: [12, 0] }
     },
 };
 
-// Alias for backward compatibility if needed, but we should prefer BLOCK_DATA
+// Compatibility export
 export const BLOCK_TEXTURES = BLOCK_DATA;
-
-// For backward compatibility or debugging
-export const BLOCK_COLORS: Record<number, number> = {
-    [BlockType.DIRT]: 0x8b4513,
-    [BlockType.GRASS]: 0x228b22,
-    [BlockType.STONE]: 0x808080,
-};
