@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Chunk } from './Chunk';
 import { TerrainGenerator } from './TerrainGenerator';
+import { BlockType, BLOCK_DATA } from './Block';
 
 export class World {
     private chunks: Map<string, Chunk> = new Map();
@@ -130,13 +131,36 @@ export class World {
         this.chunks.delete(key);
     }
 
+    /**
+     * Finds the highest solid block at the given x, z coordinates.
+     * If the required chunk is not loaded, it will be loaded synchronously.
+     */
+    public getHighestSolidBlock(x: number, z: number, startY: number = 127): number {
+        for (let y = startY; y >= 0; y--) {
+            const voxel = this.getVoxel(x, y, z);
+            if (voxel !== BlockType.AIR) {
+                const blockData = BLOCK_DATA[voxel];
+                if (blockData && blockData.isSolid) {
+                    return y + 1;
+                }
+            }
+        }
+        return 0;
+    }
+
     public getVoxel(x: number, y: number, z: number): number {
         const cx = Math.floor(x / Chunk.SIZE);
         const cy = Math.floor(y / Chunk.SIZE);
         const cz = Math.floor(z / Chunk.SIZE);
 
-        const chunk = this.chunks.get(this.getChunkKey(cx, cy, cz));
-        if (!chunk) return 0;
+        const key = this.getChunkKey(cx, cy, cz);
+        let chunk = this.chunks.get(key);
+        
+        // If chunk is not loaded, force synchronous load for critical queries
+        if (!chunk) {
+            this.loadChunk(cx, cy, cz);
+            chunk = this.chunks.get(key)!;
+        }
 
         const lx = Math.floor(((x % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);
         const ly = Math.floor(((y % Chunk.SIZE) + Chunk.SIZE) % Chunk.SIZE);

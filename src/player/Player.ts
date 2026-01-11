@@ -122,29 +122,17 @@ export class Player {
     }
 
     public spawn(x: number, y: number, z: number) {
-        // 1. 居中出生点位置，并设置初步高度加载 Chunk
+        // 1. 居中出生点位置
         const centerX = Math.floor(x) + 0.5;
         const centerZ = Math.floor(z) + 0.5;
-        this.position.set(centerX, y, centerZ);
         
-        // 2. 强制触发世界加载
-        this.world.update(this.position);
+        // 2. 获取地面高度 (内部会自动触发同步加载)
+        const groundY = this.world.getHighestSolidBlock(centerX, centerZ);
         
-        // 3. 寻找真正的实体地面：从预设高度往下寻找第一个 isSolid 的方块
-        let groundY = y;
-        for (let checkY = 63; checkY >= 0; checkY--) {
-            const voxel = this.world.getVoxel(centerX, checkY, centerZ);
-            const blockData = BLOCK_DATA[voxel];
-            if (voxel !== BlockType.AIR && blockData && blockData.isSolid) {
-                groundY = checkY + 1;
-                break;
-            }
-        }
-        
-        // 4. 应用坐标并赋予一个微小的向上偏移，防止由于浮点误差陷入方块
-        this.position.y = groundY + 0.05;
+        // 3. 应用坐标并赋予一个微小的向上偏移，防止由于浮点误差陷入方块
+        this.position.set(centerX, groundY + 0.05, centerZ);
         this.velocity.set(0, 0, 0);
-        this.canJump = false; // 初始状态在空中，由物理引擎处理着地
+        this.canJump = false; // 初始状态由物理引擎处理着地
         this.updateCameraPosition();
     }
 
