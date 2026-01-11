@@ -133,14 +133,16 @@ export class World {
 
     /**
      * Finds the highest solid block at the given x, z coordinates.
-     * If the required chunk is not loaded, it will be loaded synchronously.
+     * Updated to correctly handle spawning by ensuring the player is above water/solid ground.
      */
     public getHighestSolidBlock(x: number, z: number, startY: number = 127): number {
         for (let y = startY; y >= 0; y--) {
             const voxel = this.getVoxel(x, y, z);
             if (voxel !== BlockType.AIR) {
                 const blockData = BLOCK_DATA[voxel];
-                if (blockData && blockData.isSolid) {
+                // For spawning, we want the top of the highest non-air block
+                // including water, to avoid spawning inside/under water.
+                if (blockData) {
                     return y + 1;
                 }
             }

@@ -139,9 +139,91 @@ export class TextureManager {
             'rgba(50, 100, 200, 0.7)'
         ], waterPattern);
 
+        // --- Player Skin (Starting at 8, 0) ---
+        // We will draw a 64x32 area representing a classic Steve skin
+        this.drawSteveSkin(ctx, 8 * 16, 0);
+
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
+    }
+
+    /**
+     * Draws a procedurally generated Steve-like skin onto the atlas
+     */
+    private static drawSteveSkin(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
+        // Colors
+        const skin = '#ffdbac';
+        const skinShadow = '#e0ac69';
+        const hair = '#3d2b1f';
+        const eyes = '#ffffff';
+        const pupils = '#4040ff';
+        const mouth = '#8d6e63';
+        const shirt = '#1976d2';
+        const shirtTrim = '#1565c0';
+        const pants = '#303f9f';
+        const shoes = '#333333';
+
+        const fillRect = (x: number, y: number, w: number, h: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(offsetX + x, offsetY + y, w, h);
+        };
+
+        // --- Head ---
+        // Top/Bottom (8,0 to 24,8)
+        fillRect(8, 0, 8, 8, hair);     // Top
+        fillRect(16, 0, 8, 8, skin);    // Bottom (Neck area)
+        // Sides (0,8 to 32,16)
+        fillRect(0, 8, 8, 8, hair);     // Right side
+        fillRect(8, 8, 8, 8, skin);     // Front (Face)
+        fillRect(16, 8, 8, 8, skin);    // Left side
+        fillRect(24, 8, 8, 8, hair);    // Back
+
+        // Face details
+        fillRect(8, 8, 8, 3, hair);     // Hairline
+        fillRect(10, 11, 2, 1, eyes);   // Left eye white
+        fillRect(14, 11, 2, 1, eyes);   // Right eye white
+        fillRect(11, 11, 1, 1, pupils); // Left pupil
+        fillRect(14, 11, 1, 1, pupils); // Right pupil
+        fillRect(11, 13, 2, 1, mouth);  // Mouth/Nose area
+        fillRect(10, 12, 1, 1, hair);   // Left sideburn
+        fillRect(15, 12, 1, 1, hair);   // Right sideburn
+
+        // --- Body ---
+        // Top/Bottom
+        fillRect(20, 16, 8, 4, shirt);  // Top
+        fillRect(28, 16, 8, 4, pants);  // Bottom
+        // Sides
+        fillRect(16, 20, 4, 12, shirt); // Right
+        fillRect(20, 20, 8, 12, shirt); // Front
+        fillRect(28, 20, 4, 12, shirt); // Left
+        fillRect(32, 20, 8, 12, shirt); // Back
+        // Body details
+        fillRect(23, 20, 2, 2, skin);   // Neck V-neck
+
+        // --- Arms (Right arm, will be reused for left) ---
+        // Top/Bottom
+        fillRect(44, 16, 4, 4, shirt);  // Top
+        fillRect(48, 16, 4, 4, skin);   // Bottom
+        // Sides
+        fillRect(40, 20, 4, 12, shirt); // Right (Outer)
+        fillRect(44, 20, 4, 12, shirt); // Front
+        fillRect(48, 20, 4, 12, shirt); // Left (Inner)
+        fillRect(52, 20, 4, 12, shirt); // Back
+        // Arm skin (bottom half)
+        fillRect(40, 26, 16, 6, skin);  // All sides skin below elbow
+
+        // --- Legs (Right leg, will be reused for left) ---
+        // Top/Bottom
+        fillRect(4, 16, 4, 4, pants);   // Top
+        fillRect(8, 16, 4, 4, shoes);   // Bottom
+        // Sides
+        fillRect(0, 20, 4, 12, pants);  // Right (Outer)
+        fillRect(4, 20, 4, 12, pants);  // Front
+        fillRect(8, 20, 4, 12, pants);  // Left (Inner)
+        fillRect(12, 20, 4, 12, pants); // Back
+        // Shoes
+        fillRect(0, 30, 16, 2, shoes);  // Shoes at bottom
     }
 
     public static getAtlasDataURL(): string {

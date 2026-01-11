@@ -126,13 +126,24 @@ export class Player {
         const centerX = Math.floor(x) + 0.5;
         const centerZ = Math.floor(z) + 0.5;
         
-        // 2. 获取地面高度 (内部会自动触发同步加载)
-        const groundY = this.world.getHighestSolidBlock(centerX, centerZ);
+        // 2. 获取地面高度 (寻找最高非空气方块)
+        let groundY = this.world.getHighestSolidBlock(centerX, centerZ);
         
-        // 3. 应用坐标并赋予一个微小的向上偏移，防止由于浮点误差陷入方块
-        this.position.set(centerX, groundY + 0.05, centerZ);
+        // 3. 安全重生机制：确保出生点上方有 2 格空气，防止陷入方块
+        while (groundY < 128) {
+            const blockFoot = this.world.getVoxel(centerX, groundY, centerZ);
+            const blockHead = this.world.getVoxel(centerX, groundY + 1, centerZ);
+            
+            if (blockFoot === BlockType.AIR && blockHead === BlockType.AIR) {
+                break;
+            }
+            groundY++;
+        }
+
+        // 4. 应用坐标并赋予一个微小的向上偏移
+        this.position.set(centerX, groundY + 0.1, centerZ);
         this.velocity.set(0, 0, 0);
-        this.canJump = false; // 初始状态由物理引擎处理着地
+        this.canJump = false; 
         this.updateCameraPosition();
     }
 
@@ -509,7 +520,9 @@ export class Player {
         const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         this.characterModel.group.rotation.y = Math.atan2(camDir.x, camDir.z);
         
-        this.characterModel.updateAnimation(this.walkTime, isActuallyMoving);
+        // Pass camera pitch to character model
+        const headPitch = this.camera.rotation.x;
+        this.characterModel.updateAnimation(this.walkTime, isActuallyMoving, headPitch);
     }
 
     private updateCameraPosition() {
@@ -525,10 +538,10 @@ export class Player {
             // 第三人称视角（背视）
             const camDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.camera.quaternion);
             const targetPos = this.position.clone();
-            targetPos.y += Physics.EYE_HEIGHT;
+            targetPos.y += Physics.EYE_HEIGHT + 0.5; // 稍微抬高视点，防止被肩膀遮挡
             
-            // 相机向后偏移 4 个单位
-            const offset = camDir.multiplyScalar(4);
+            // 相机向后偏移 5 个单位 (增加距离以看清全貌)
+            const offset = camDir.multiplyScalar(5);
             this.camera.position.copy(targetPos).add(offset);
             
             // 显示完整模型

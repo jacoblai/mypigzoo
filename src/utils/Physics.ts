@@ -10,8 +10,8 @@ export interface PhysicsResult {
 
 export class Physics {
     public static readonly PLAYER_RADIUS = 0.35;
-    public static readonly PLAYER_HEIGHT = 1.8;
-    public static readonly EYE_HEIGHT = 1.6;
+    public static readonly PLAYER_HEIGHT = 2.0;
+    public static readonly EYE_HEIGHT = 1.625; // 26 pixels high
     private static readonly EPSILON = 0.001;
 
     public static collide(world: World, position: THREE.Vector3, velocity: THREE.Vector3, delta: number): PhysicsResult {

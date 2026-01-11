@@ -33,30 +33,49 @@ export class Hand {
         dirLight.position.set(2, 2, 2);
         this.scene.add(dirLight);
 
-        // 1. 创建手臂 (更符合比例的长方体)
-        const armGeom = new THREE.BoxGeometry(0.35, 0.35, 1.0);
+        // 1. 创建手臂 (使用与 CharacterModel 一致的 4x4x12 像素比例)
+        const PX = 1 / 16;
+        const armGeom = new THREE.BoxGeometry(4 * PX, 4 * PX, 12 * PX);
         
-        // 为手臂设置 UV 坐标，强制指向皮肤色块 (4, 0)
+        // 为手臂设置 UV 坐标，匹配 Steve 皮肤中的手臂位置 (40, 16)
         const uvs = armGeom.attributes.uv.array as Float32Array;
-        const ATLAS_SIZE = 16;
-        const u = 4 / ATLAS_SIZE;
-        const v = 1 - (0 + 1) / ATLAS_SIZE;
-        const size = 1 / ATLAS_SIZE;
-        
-        for (let i = 0; i < uvs.length; i += 2) {
-            uvs[i] = u + (uvs[i] > 0.5 ? size : 0);
-            uvs[i+1] = v + (uvs[i+1] > 0.5 ? size : 0);
-        }
+        const ATLAS_SIZE = 256;
+        const SKIN_X = 8 * 16;
+        const SKIN_Y = 0;
+        const sx = 40; 
+        const sy = 16;
+        const w = 4; const h = 12; const d = 4;
+
+        const setFaceUV = (faceIdx: number, x: number, y: number, width: number, height: number) => {
+            const u = (SKIN_X + x) / ATLAS_SIZE;
+            const v = 1 - (SKIN_Y + y + height) / ATLAS_SIZE;
+            const uw = width / ATLAS_SIZE;
+            const vh = height / ATLAS_SIZE;
+            const start = faceIdx * 8;
+            uvs[start + 0] = u;          uvs[start + 1] = v + vh;
+            uvs[start + 2] = u + uw;     uvs[start + 3] = v + vh;
+            uvs[start + 4] = u;          uvs[start + 5] = v;
+            uvs[start + 6] = u + uw;     uvs[start + 7] = v;
+        };
+
+        // Arms: Top(44,16), Bottom(48,16), Right(40,20), Front(44,20), Left(48,20), Back(52,20)
+        setFaceUV(0, sx + d + w, sy + d, d, h);      // Right
+        setFaceUV(1, sx, sy + d, d, h);              // Left
+        setFaceUV(2, sx + d, sy, w, d);              // Top
+        setFaceUV(3, sx + d + w, sy, w, d);          // Bottom
+        setFaceUV(4, sx + d, sy + d, w, h);          // Front
+        setFaceUV(5, sx + d + w + d, sy + d, w, h);  // Back
 
         this.armMesh = new THREE.Mesh(armGeom, TextureManager.getMaterial());
         // 将手臂中心向后移，使其看起来是从相机下方伸出的
-        this.armMesh.position.set(0, 0, -0.5); 
+        // 旋转手臂，使其长轴沿 Z 轴
+        this.armMesh.rotation.x = Math.PI / 2;
+        this.armMesh.position.set(0, 0, -0.3); 
         this.swingGroup.add(this.armMesh);
 
         // 2. 调整整个手部的初始姿态
-        // 位于屏幕右下角，并带有一个向内的倾斜角
-        this.group.position.set(0.9, -0.7, 1.5);
-        this.group.rotation.set(-0.2, -0.4, 0.2); 
+        this.group.position.set(0.8, -0.6, 1.8);
+        this.group.rotation.set(-0.1, -0.3, 0.1); 
     }
 
     public setBlock(type: BlockType) {
