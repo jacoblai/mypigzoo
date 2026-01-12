@@ -17,8 +17,9 @@ export class TextureManager {
             this.material = new THREE.MeshLambertMaterial({
                 map: this.texture,
                 transparent: true,
-                alphaTest: 0.01, // 降低阈值以允许半透明水体渲染
-                side: THREE.DoubleSide
+                alphaTest: 0.1, 
+                side: THREE.DoubleSide,
+                vertexColors: true
             });
         }
         return this.material;
@@ -33,79 +34,179 @@ export class TextureManager {
         // Fill with transparent
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Helper to draw a pixel-art tile
-        const drawTile = (tx: number, ty: number, colors: string[], pattern: number[][]) => {
-            const px = tx * this.TILE_PIXELS;
-            const py = ty * this.TILE_PIXELS;
-            for (let y = 0; y < 16; y++) {
-                for (let x = 0; x < 16; x++) {
-                    const colorIndex = pattern[y][x];
-                    if (colorIndex >= 0) {
-                        ctx.fillStyle = colors[colorIndex];
-                        ctx.fillRect(px + x, py + y, 1, 1);
-                    }
-                }
-            }
+        // Helper to draw a pixel with noise
+        const drawPixel = (px: number, py: number, color: {r: number, g: number, b: number, a?: number}, noise: number = 0) => {
+            const factor = 1 + (Math.random() - 0.5) * noise;
+            const r = Math.min(255, Math.max(0, Math.floor(color.r * factor)));
+            const g = Math.min(255, Math.max(0, Math.floor(color.g * factor)));
+            const b = Math.min(255, Math.max(0, Math.floor(color.b * factor)));
+            const a = color.a !== undefined ? color.a : 1.0;
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+            ctx.fillRect(px, py, 1, 1);
         };
 
-        // Noise generator for textures
-        const getNoisePattern = (seed: number = 0) => {
-            const pattern: number[][] = [];
-            for (let y = 0; y < 16; y++) {
-                pattern[y] = [];
-                for (let x = 0; x < 16; x++) {
-                    pattern[y][x] = Math.floor(Math.random() * 3);
-                }
-            }
-            return pattern;
+        const hexToRgb = (hex: string) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return { r, g, b };
         };
 
-        // --- Generate Procedural Textures ---
+        // --- Optimized Procedural Textures ---
 
-        // Stone (3, 0)
-        drawTile(3, 0, ['#888888', '#777777', '#999999'], getNoisePattern());
-        // Cobblestone (0, 1)
-        drawTile(0, 1, ['#777777', '#555555', '#999999'], getNoisePattern());
-        // Grass Top (0, 0)
-        drawTile(0, 0, ['#4aad31', '#5ebf44', '#3d8e28'], getNoisePattern());
-        // Grass Side (1, 0) - Mix of dirt and grass
-        const grassSidePattern = getNoisePattern();
-        for(let x=0; x<16; x++) for(let y=0; y<4; y++) grassSidePattern[y][x] = Math.random() > 0.3 ? 0 : 3;
-        drawTile(1, 0, ['#4aad31', '#795548', '#8d6e63', '#5ebf44'], grassSidePattern);
+        // Stone (3, 0) - More structured rock look
+        const stoneColor = hexToRgb('#888888');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 3 * 16 + x;
+                const py = 0 * 16 + y;
+                // Add some structural noise for cracks
+                const isCrack = Math.random() < 0.05 || (x + y) % 7 === 0 && Math.random() < 0.2;
+                drawPixel(px, py, stoneColor, isCrack ? 0.3 : 0.1);
+            }
+        }
+
+        // Cobblestone (0, 1) - Defined stones
+        const cobbleColor = hexToRgb('#777777');
+        const cobbleBorder = hexToRgb('#444444');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 0 * 16 + x;
+                const py = 1 * 16 + y;
+                const isEdge = x === 0 || y === 0 || x === 8 || y === 8;
+                drawPixel(px, py, isEdge ? cobbleBorder : cobbleColor, 0.15);
+            }
+        }
+
         // Dirt (2, 0)
-        drawTile(2, 0, ['#795548', '#8d6e63', '#6d4c41'], getNoisePattern());
+        const dirtColor = hexToRgb('#795548');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 2 * 16 + x;
+                const py = 0 * 16 + y;
+                drawPixel(px, py, dirtColor, 0.2);
+            }
+        }
+
+        // Grass Top (0, 0)
+        const grassColor = hexToRgb('#4aad31');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 0 * 16 + x;
+                const py = 0 * 16 + y;
+                // Clumped grass look
+                const noise = (Math.sin(x * 0.5) + Math.cos(y * 0.5)) * 0.1;
+                drawPixel(px, py, grassColor, 0.15 + noise);
+            }
+        }
+
+        // Grass Side (1, 0)
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 1 * 16 + x;
+                const py = 0 * 16 + y;
+                // Jagged transition from grass to dirt
+                const grassDepth = 4 + Math.sin(x * 0.8) * 2 + (Math.random() - 0.5) * 2;
+                if (y < grassDepth) {
+                    drawPixel(px, py, grassColor, 0.15);
+                } else {
+                    drawPixel(px, py, dirtColor, 0.15);
+                }
+            }
+        }
+
+        // Wood Side (4, 1) - Vertical grain
+        const logColor = hexToRgb('#6d4c41');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 4 * 16 + x;
+                const py = 1 * 16 + y;
+                const grain = Math.sin(x * 0.5) * 0.1;
+                drawPixel(px, py, logColor, 0.1 + grain);
+            }
+        }
+
+        // Wood Top (5, 1) - Concentric rings
+        const ringColor1 = hexToRgb('#d7ccc8');
+        const ringColor2 = hexToRgb('#bcaaa4');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 5 * 16 + x;
+                const py = 1 * 16 + y;
+                const dist = Math.sqrt((x - 7.5)**2 + (y - 7.5)**2);
+                const ring = Math.floor(dist) % 2 === 0;
+                drawPixel(px, py, ring ? ringColor1 : ringColor2, 0.05);
+            }
+        }
+
         // Sand (2, 1)
-        drawTile(2, 1, ['#ddd199', '#e8dfae', '#d3c68a'], getNoisePattern());
+        const sandColor = hexToRgb('#ddd199');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 2 * 16 + x;
+                const py = 1 * 16 + y;
+                drawPixel(px, py, sandColor, 0.1);
+            }
+        }
+
         // Gravel (3, 1)
-        drawTile(3, 1, ['#9e9e9e', '#888888', '#bdbdbd'], getNoisePattern());
+        const gravelColor = hexToRgb('#9e9e9e');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 3 * 16 + x;
+                const py = 1 * 16 + y;
+                drawPixel(px, py, gravelColor, 0.3);
+            }
+        }
+
         // Bedrock (1, 1)
-        drawTile(1, 1, ['#333333', '#111111', '#555555'], getNoisePattern());
-        
-        // Wood Side (4, 1)
-        drawTile(4, 1, ['#6d4c41', '#5d4037', '#795548'], getNoisePattern());
-        // Wood Top (5, 1)
-        drawTile(5, 1, ['#d7ccc8', '#bcaaa4', '#8d6e63'], getNoisePattern());
-        
-        // Skin for Hand (4, 0)
-        drawTile(4, 0, ['#ffdbac', '#f1c27d', '#e0ac69'], getNoisePattern());
+        const bedrockColor = hexToRgb('#333333');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 1 * 16 + x;
+                const py = 1 * 16 + y;
+                drawPixel(px, py, bedrockColor, 0.5);
+            }
+        }
 
-        // Clothes (Blue shirt) (5, 0)
-        drawTile(5, 0, ['#1976d2', '#2196f3', '#1565c0'], getNoisePattern());
+        // Planks (4, 0)
+        const plankColor = hexToRgb('#8d6e63');
+        const plankBorder = hexToRgb('#5d4037');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 4 * 16 + x;
+                const py = 0 * 16 + y;
+                const isEdge = y % 8 === 0 || x === 0 || x === 15;
+                drawPixel(px, py, isEdge ? plankBorder : plankColor, 0.1);
+            }
+        }
 
-        // Pants (Dark blue) (6, 0)
-        drawTile(6, 0, ['#303f9f', '#3f51b5', '#283593'], getNoisePattern());
-        
-        // Leaves (4, 3) - Sparse pattern
-        const leavesPattern = getNoisePattern();
-        const leavesColors = ['#2e7d32', '#388e3c', '#1b5e20'];
-        drawTile(4, 3, leavesColors, leavesPattern);
+        // Leaves (4, 3)
+        const leafColor = hexToRgb('#2e7d32');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 4 * 16 + x;
+                const py = 3 * 16 + y;
+                const isHole = Math.random() < 0.15;
+                if (!isHole) {
+                    drawPixel(px, py, leafColor, 0.3);
+                }
+            }
+        }
 
         // Ores
-        const drawOre = (tx: number, ty: number, oreColor: string) => {
-            const pattern = getNoisePattern();
-            const colors = ['#888888', '#777777', oreColor];
-            for(let i=0; i<20; i++) pattern[Math.floor(Math.random()*16)][Math.floor(Math.random()*16)] = 2;
-            drawTile(tx, ty, colors, pattern);
+        const drawOre = (tx: number, ty: number, oreColorHex: string) => {
+            const oreColor = hexToRgb(oreColorHex);
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 16; x++) {
+                    const px = tx * 16 + x;
+                    const py = ty * 16 + y;
+                    const isOre = Math.random() < 0.1 && (
+                        (x > 2 && x < 13 && y > 2 && y < 13)
+                    );
+                    drawPixel(px, py, isOre ? oreColor : stoneColor, isOre ? 0.1 : 0.1);
+                }
+            }
         };
         drawOre(2, 2, '#333333'); // Coal
         drawOre(1, 2, '#e2c0aa'); // Iron
@@ -113,34 +214,54 @@ export class TextureManager {
         drawOre(2, 3, '#00e5ff'); // Diamond
 
         // Glass (1, 3)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(1 * 16 + 0.5, 3 * 16 + 0.5, 15, 15);
-        ctx.beginPath();
-        ctx.moveTo(1*16+3, 3*16+3); ctx.lineTo(1*16+6, 3*16+6);
-        ctx.stroke();
-
-        // Cross types (Flowers/Grass) - Simple shapes
-        const drawCross = (tx: number, ty: number, color: string) => {
-            const px = tx * 16; const py = ty * 16;
-            ctx.fillStyle = color;
-            ctx.fillRect(px + 6, py + 4, 4, 12);
-            ctx.fillRect(px + 4, py + 6, 8, 4);
-        };
-        drawCross(7, 2, '#4aad31'); // Tall Grass
-        drawCross(13, 0, '#fdd835'); // Dandelion
-        drawCross(12, 0, '#e53935'); // Rose
+        const glassColor = { r: 255, g: 255, b: 255, a: 0.3 };
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 1 * 16 + x;
+                const py = 3 * 16 + y;
+                const isFrame = x === 0 || x === 15 || y === 0 || y === 15;
+                const isReflection = (x + y === 6 || x + y === 7) && x > 2 && x < 10;
+                if (isFrame) {
+                    drawPixel(px, py, { r: 255, g: 255, b: 255, a: 0.5 }, 0);
+                } else if (isReflection) {
+                    drawPixel(px, py, { r: 255, g: 255, b: 255, a: 0.4 }, 0);
+                }
+            }
+        }
 
         // Water (14, 0)
-        const waterPattern = getNoisePattern();
-        drawTile(14, 0, [
-            'rgba(63, 118, 228, 0.7)', 
-            'rgba(66, 135, 245, 0.7)', 
-            'rgba(50, 100, 200, 0.7)'
-        ], waterPattern);
+        const waterBase = hexToRgb('#3f76e4');
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const px = 14 * 16 + x;
+                const py = 0 * 16 + y;
+                drawPixel(px, py, { ...waterBase, a: 0.7 }, 0.2);
+            }
+        }
 
-        // --- Player Skin (Starting at 8, 0) ---
-        // We will draw a 64x32 area representing a classic Steve skin
+        // Cross types (Flowers/Grass)
+        const drawCross = (tx: number, ty: number, colorHex: string, type: 'grass' | 'flower') => {
+            const color = hexToRgb(colorHex);
+            for (let y = 4; y < 16; y++) {
+                for (let x = 4; x < 12; x++) {
+                    const px = tx * 16 + x;
+                    const py = ty * 16 + y;
+                    if (type === 'grass') {
+                        if (Math.random() < 0.6) drawPixel(px, py, color, 0.3);
+                    } else {
+                        const isStem = x >= 7 && x <= 8;
+                        const isPetal = y < 8 && Math.abs(x - 7.5) < 3;
+                        if (isPetal) drawPixel(px, py, color, 0.1);
+                        else if (isStem) drawPixel(px, py, hexToRgb('#4aad31'), 0.1);
+                    }
+                }
+            }
+        };
+        drawCross(7, 2, '#4aad31', 'grass'); // Tall Grass
+        drawCross(13, 0, '#fdd835', 'flower'); // Dandelion
+        drawCross(12, 0, '#e53935', 'flower'); // Rose
+
+        // Hand & Player
         this.drawSteveSkin(ctx, 8 * 16, 0);
 
         const texture = new THREE.CanvasTexture(canvas);
