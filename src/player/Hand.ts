@@ -37,6 +37,10 @@ export class Hand {
         const PX = 1 / 16;
         const armGeom = new THREE.BoxGeometry(4 * PX, 4 * PX, 12 * PX);
         
+        // Add white vertex colors because the material uses vertexColors: true
+        const colors = new Float32Array(armGeom.attributes.position.count * 3).fill(1);
+        armGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
         // 为手臂设置 UV 坐标，匹配 Steve 皮肤中的手臂位置 (40, 16)
         const uvs = armGeom.attributes.uv.array as Float32Array;
         const ATLAS_SIZE = 256;

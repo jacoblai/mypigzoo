@@ -11,6 +11,14 @@ if (container) {
     // 在 Spawn 前无需手动 update，spawn 内部已包含逻辑
     player.spawn(8, 32, 8);
 
+    // 初始生成一些小猪
+    for (let i = 0; i < 5; i++) {
+        const x = 8 + (Math.random() - 0.5) * 10;
+        const z = 8 + (Math.random() - 0.5) * 10;
+        const y = world.getHighestSolidBlock(x, z);
+        player.entityManager.spawnPig(x, y, z);
+    }
+
     // Register update loop
     engine.addUpdateCallback((delta) => {
         // 限制 delta 范围，防止因页面卡顿导致物理引擎瞬间位移过大

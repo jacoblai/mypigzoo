@@ -263,10 +263,74 @@ export class TextureManager {
 
         // Hand & Player
         this.drawSteveSkin(ctx, 8 * 16, 0);
+        
+        // Animals
+        this.drawPigSkin(ctx, 8 * 16, 64);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
+    }
+
+    /**
+     * Draws a procedurally generated Pig skin onto the atlas
+     */
+    private static drawPigSkin(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
+        const pink = '#ffafaf';
+        const pinkShadow = '#f08080';
+        const snoutColor = '#ffc0cb';
+        const eyeWhite = '#ffffff';
+        const eyeBlack = '#000000';
+
+        const fillRect = (x: number, y: number, w: number, h: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(offsetX + x, offsetY + y, w, h);
+        };
+
+        // --- Head (8x8x8) at (0, 0) ---
+        // Layout: Top(8,0), Bottom(16,0), Left(0,8), Front(8,8), Right(16,8), Back(24,8)
+        fillRect(8, 0, 8, 8, pinkShadow);  // Top
+        fillRect(16, 0, 8, 8, pinkShadow); // Bottom
+        fillRect(0, 8, 8, 8, pink);        // Left
+        fillRect(8, 8, 8, 8, pink);        // Front
+        fillRect(16, 8, 8, 8, pink);       // Right
+        fillRect(24, 8, 8, 8, pink);       // Back
+        
+        // Eyes (Front is 8,8)
+        fillRect(9, 11, 2, 1, eyeWhite);
+        fillRect(13, 11, 2, 1, eyeWhite);
+        fillRect(9, 11, 1, 1, eyeBlack);
+        fillRect(14, 11, 1, 1, eyeBlack);
+
+        // --- Snout (4x3x2) at (10, 14) ---
+        // Layout: Front at sx+d, sy+d = 10+2, 14+2 = 12, 16
+        fillRect(12, 16, 4, 3, snoutColor); 
+        fillRect(13, 17, 1, 1, pinkShadow); // Nostril L
+        fillRect(15, 17, 1, 1, pinkShadow); // Nostril R
+
+        // --- Body (10x8x14) at (16, 16) ---
+        // sx=16, sy=16, w=10, h=8, d=14
+        // Top: (sx+d, sy) = (30, 16) size 10x14
+        fillRect(30, 16, 10, 14, pinkShadow); 
+        // Bottom: (sx+d+w, sy) = (40, 16) size 10x14
+        fillRect(40, 16, 10, 14, pinkShadow); 
+        // Left: (sx, sy+d) = (16, 30) size 14x8
+        fillRect(16, 30, 14, 8, pink); 
+        // Front: (sx+d, sy+d) = (30, 30) size 10x8
+        fillRect(30, 30, 10, 8, pink); 
+        // Right: (sx+d+w, sy+d) = (40, 30) size 14x8
+        fillRect(40, 30, 14, 8, pink); 
+        // Back: (sx+d+w+d, sy+d) = (54, 30) size 10x8
+        fillRect(54, 30, 10, 8, pink); 
+
+        // --- Legs (4x6x4) at (0, 34) ---
+        // sx=0, sy=34, w=4, h=6, d=4
+        fillRect(4, 34, 4, 4, pinkShadow);  // Top
+        fillRect(8, 34, 4, 4, pinkShadow);  // Bottom
+        fillRect(0, 38, 4, 6, pink);        // Left
+        fillRect(4, 38, 4, 6, pink);        // Front
+        fillRect(8, 38, 4, 6, pink);        // Right
+        fillRect(12, 38, 4, 6, pink);       // Back
     }
 
     /**

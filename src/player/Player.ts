@@ -40,8 +40,8 @@ export class Player {
     private statsUI: StatsUI;
     private hand: Hand;
     private characterModel: CharacterModel;
-    private audioManager: AudioManager;
-    private entityManager: EntityManager;
+    public audioManager: AudioManager;
+    public entityManager: EntityManager;
     
     private stepTimer = 0;
     private walkTime = 0;

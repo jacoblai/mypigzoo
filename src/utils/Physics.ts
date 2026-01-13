@@ -14,7 +14,7 @@ export class Physics {
     public static readonly EYE_HEIGHT = 1.625; // 26 pixels high
     private static readonly EPSILON = 0.001;
 
-    public static collide(world: World, position: THREE.Vector3, velocity: THREE.Vector3, delta: number): PhysicsResult {
+    public static collide(world: World, position: THREE.Vector3, velocity: THREE.Vector3, delta: number, radius: number = 0.35, height: number = 2.0): PhysicsResult {
         const nextPos = position.clone();
         const finalVelocity = velocity.clone();
         let isGrounded = false;
@@ -24,12 +24,12 @@ export class Physics {
         // 1. Y 轴 (处理重力和跳跃)
         const stepY = velocity.y * delta;
         nextPos.y += stepY;
-        if (this.isColliding(world, nextPos)) {
+        if (this.isColliding(world, nextPos, radius, height)) {
             if (stepY < 0) { // 落地
                 nextPos.y = Math.ceil(nextPos.y) + this.EPSILON;
                 isGrounded = true;
             } else { // 撞顶
-                nextPos.y = Math.floor(nextPos.y + this.PLAYER_HEIGHT) - this.PLAYER_HEIGHT - this.EPSILON;
+                nextPos.y = Math.floor(nextPos.y + height) - height - this.EPSILON;
             }
             finalVelocity.y = 0;
         }
@@ -37,7 +37,7 @@ export class Physics {
         // 2. X 轴
         const stepX = velocity.x * delta;
         nextPos.x += stepX;
-        if (this.isColliding(world, nextPos)) {
+        if (this.isColliding(world, nextPos, radius, height)) {
             nextPos.x = position.x;
             finalVelocity.x = 0;
         }
@@ -45,7 +45,7 @@ export class Physics {
         // 3. Z 轴
         const stepZ = velocity.z * delta;
         nextPos.z += stepZ;
-        if (this.isColliding(world, nextPos)) {
+        if (this.isColliding(world, nextPos, radius, height)) {
             nextPos.z = position.z;
             finalVelocity.z = 0;
         }
@@ -57,10 +57,7 @@ export class Physics {
         };
     }
 
-    private static isColliding(world: World, pos: THREE.Vector3): boolean {
-        const r = this.PLAYER_RADIUS;
-        const h = this.PLAYER_HEIGHT;
-        
+    private static isColliding(world: World, pos: THREE.Vector3, r: number, h: number): boolean {
         // 检查 8 个顶点以确保全包围盒碰撞
         const offsets = [
             [r, 0, r], [r, 0, -r], [-r, 0, r], [-r, 0, -r],

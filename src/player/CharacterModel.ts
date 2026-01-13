@@ -78,6 +78,11 @@ export class CharacterModel {
     // ... createSkinBoxGeometry method remains the same ...
     private createSkinBoxGeometry(w: number, h: number, d: number, sx: number, sy: number): THREE.BoxGeometry {
         const geom = new THREE.BoxGeometry(w * this.PX, h * this.PX, d * this.PX);
+        
+        // Add white vertex colors because the material uses vertexColors: true (for AO)
+        const colors = new Float32Array(geom.attributes.position.count * 3).fill(1);
+        geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
         const uvs = geom.attributes.uv.array as Float32Array;
 
         const ATLAS_SIZE = 256;
