@@ -12,7 +12,14 @@ export abstract class Entity {
         this.position.set(x, y, z);
     }
 
-    public abstract update(delta: number, world: World): void;
+    protected updateMesh(): void {
+        if (this.mesh) {
+            this.mesh.position.copy(this.position);
+            this.mesh.rotation.copy(this.rotation);
+        }
+    }
+
+    public abstract update(delta: number, world: World, ...args: any[]): void;
 
     public dispose(): void {
         if (this.mesh) {

@@ -11,6 +11,7 @@ export class PigModel {
     public legRF: THREE.Group;
     public legLB: THREE.Group;
     public legRB: THREE.Group;
+    public heart: THREE.Mesh | null = null;
 
     private readonly PX = 1 / 16;
 
@@ -64,6 +65,18 @@ export class PigModel {
         this.legRB = createLeg(3, -8);
 
         this.contentGroup.add(this.legLF, this.legRF, this.legLB, this.legRB);
+
+        // 4. Heart (Simplified Plane)
+        const heartGeom = new THREE.PlaneGeometry(8 * this.PX, 8 * this.PX);
+        const heartMat = new THREE.MeshBasicMaterial({ 
+            color: 0xff4444, 
+            transparent: true, 
+            side: THREE.DoubleSide,
+            visible: false 
+        });
+        this.heart = new THREE.Mesh(heartGeom, heartMat);
+        this.heart.position.y = 22 * this.PX;
+        this.group.add(this.heart);
     }
 
     private createSkinBoxGeometry(w: number, h: number, d: number, sx: number, sy: number): THREE.BoxGeometry {
@@ -103,7 +116,7 @@ export class PigModel {
         return geom;
     }
 
-    public updateAnimation(delta: number, walkTime: number, isMoving: boolean) {
+    public updateAnimation(delta: number, walkTime: number, isMoving: boolean, inLove: boolean = false) {
         if (isMoving) {
             const speed = 10;
             const angle = Math.sin(walkTime * speed) * 0.5;
@@ -121,5 +134,34 @@ export class PigModel {
             this.legRB.rotation.x *= (1 - lerp);
             this.contentGroup.position.y *= (1 - lerp);
         }
+
+        if (this.heart) {
+            this.heart.visible = inLove;
+            if (inLove) {
+                this.heart.rotation.y += delta * 5;
+                this.heart.position.y = (22 * this.PX) + Math.sin(Date.now() * 0.005) * 0.1;
+            }
+        }
+    }
+
+    public applyTraits(color: THREE.Color, scale: number) {
+        this.group.scale.set(scale, scale, scale);
+        
+        // Tint all meshes in the model
+        this.group.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                const geom = object.geometry as THREE.BufferGeometry;
+                // Only tint meshes that have vertex colors (skin parts)
+                if (geom.attributes.color) {
+                    const colors = geom.attributes.color.array as Float32Array;
+                    for (let i = 0; i < colors.length; i += 3) {
+                        colors[i] = color.r;
+                        colors[i + 1] = color.g;
+                        colors[i + 2] = color.b;
+                    }
+                    geom.attributes.color.needsUpdate = true;
+                }
+            }
+        });
     }
 }

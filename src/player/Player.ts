@@ -10,9 +10,12 @@ import { CharacterModel } from './CharacterModel';
 import { AudioManager } from '../core/AudioManager';
 import { EntityManager } from '../world/EntityManager';
 import { InventoryUI } from './InventoryUI';
+import { Pig } from '../entity/Pig';
 
 import { PlayerStats } from './PlayerStats';
 import { StatsUI } from './StatsUI';
+import { CommandSystem } from '../core/CommandSystem';
+import { CommandUI } from './CommandUI';
 
 export class Player {
     private controls: PointerLockControls;
@@ -38,6 +41,8 @@ export class Player {
     private inventoryUI: InventoryUI;
     private stats: PlayerStats;
     private statsUI: StatsUI;
+    private commandSystem: CommandSystem;
+    private commandUI: CommandUI;
     private hand: Hand;
     private characterModel: CharacterModel;
     public audioManager: AudioManager;
@@ -68,6 +73,24 @@ export class Player {
         this.inventoryUI = new InventoryUI(this.inventory);
         this.stats = new PlayerStats();
         this.statsUI = new StatsUI(this.stats);
+
+        this.commandSystem = new CommandSystem();
+        this.commandUI = new CommandUI(this.commandSystem, () => ({
+            inventory: this.inventory,
+            entityManager: this.entityManager,
+            world: this.world,
+            position: this.position,
+            direction: new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+        }));
+
+        // 当指令界面打开时，释放控制器
+        this.commandUI.setOnToggle((open) => {
+            if (open) {
+                this.controls.unlock();
+            } else {
+                this.controls.lock();
+            }
+        });
         
         // 订阅伤害事件播放声效
         this.stats.onDamage = () => {
@@ -160,12 +183,55 @@ export class Player {
 
         if (isRightClick) {
             this.hand.swing();
-            this.placeBlock();
+            this.handleInteraction();
         } else if (event.button === 0) {
-            this.isMining = true;
-            // 立即开始摆动，后续由 handleMining 维持
-            this.hand.swing();
+            // Check for entity attack first
+            if (!this.handleAttack()) {
+                this.isMining = true;
+                this.hand.swing();
+            }
         }
+    }
+
+    private handleInteraction() {
+        const origin = this.camera.position;
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        
+        // 1. Check for entities first (Increased range to 8)
+        const entity = this.entityManager.intersectEntities(origin, direction, 8);
+        if (entity && entity instanceof Pig) {
+            const selected = this.inventory.getSelectedSlot();
+            if (selected && selected.type === BlockType.CARROT) {
+                // Try feeding
+                if (entity.feed()) {
+                    this.inventory.consumeSelected(1);
+                    this.inventoryUI.update();
+                    this.updateHand();
+                    this.audioManager.play('place'); 
+                    return;
+                } else {
+                    // Feedback even if they can't eat yet (e.g. cooldown)
+                    this.audioManager.play('step');
+                }
+            }
+        }
+
+        // 2. Fallback to block placement
+        this.placeBlock();
+    }
+
+    private handleAttack(): boolean {
+        const origin = this.camera.position;
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        
+        const entity = this.entityManager.intersectEntities(origin, direction, 4);
+        if (entity) {
+            this.hand.swing();
+            // TODO: Implement damage logic
+            this.audioManager.play('break'); 
+            return true;
+        }
+        return false;
     }
 
     private onMouseUp(event: MouseEvent) {
@@ -200,8 +266,14 @@ export class Player {
 
     private onKeyDown(event: KeyboardEvent) {
         if (this.isInventoryOpen && event.code !== 'KeyE' && event.code !== 'Escape') return;
+        if (this.commandUI.isFocused() && event.code !== 'Enter' && event.code !== 'Escape') return;
 
         switch (event.code) {
+            case 'Slash':
+                if (!this.isInventoryOpen) {
+                    this.commandUI.toggle(true);
+                }
+                break;
             case 'KeyW': this.moveForward = true; break;
             case 'KeyS': this.moveBackward = true; break;
             case 'KeyA': this.moveLeft = true; break;
@@ -218,11 +290,13 @@ export class Player {
                 break;
             case 'KeyR':
                 this.hand.swing();
-                this.placeBlock();
+                this.handleInteraction();
                 break;
             case 'KeyF':
-                this.isMining = true;
-                this.hand.swing();
+                if (!this.handleAttack()) {
+                    this.isMining = true;
+                    this.hand.swing();
+                }
                 break;
             case 'Digit1': this.selectSlot(0); break;
             case 'Digit2': this.selectSlot(1); break;

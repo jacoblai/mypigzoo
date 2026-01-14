@@ -31,6 +31,7 @@ export enum BlockType {
     TALL_GRASS = 40,
     DANDELION = 41,
     ROSE = 42,
+    CARROT = 43,
 
     // Fluids
     WATER = 50,
@@ -208,6 +209,17 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         isSolid: false,
         hardness: 0,
         textures: { all: [12, 0] }
+    },
+    [BlockType.CARROT]: {
+        name: 'Carrot',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        isSolid: false,
+        hardness: 0,
+        textures: { all: [12, 5] }, // Placeholder texture coordinate
+        isEdible: true,
+        nutrition: 3,
+        saturation: 2.4
     },
     [BlockType.WATER]: {
         name: 'Water',
