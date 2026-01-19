@@ -20,7 +20,12 @@ export class PigModel {
         this.contentGroup = new THREE.Group();
         this.group.add(this.contentGroup);
 
-        const material = TextureManager.getMaterial();
+        // Clone material for each pig to allow individual hurt effects/tinting
+        const material = TextureManager.getMaterial().clone();
+        
+        // Ensure the cloned material has its own emissive property
+        material.emissive = new THREE.Color(0x000000);
+        material.emissiveIntensity = 0;
 
         // 1. Body (10x8x14)
         // In Minecraft, the body is rotated or the dimensions are different. 
@@ -116,7 +121,7 @@ export class PigModel {
         return geom;
     }
 
-    public updateAnimation(delta: number, walkTime: number, isMoving: boolean, inLove: boolean = false) {
+    public updateAnimation(delta: number, walkTime: number, isMoving: boolean, inLove: boolean = false, hurtTimer: number = 0) {
         if (isMoving) {
             const speed = 10;
             const angle = Math.sin(walkTime * speed) * 0.5;
@@ -142,6 +147,30 @@ export class PigModel {
                 this.heart.position.y = (22 * this.PX) + Math.sin(Date.now() * 0.005) * 0.1;
             }
         }
+
+        // Apply red tint if hurt
+        if (hurtTimer > 0) {
+            this.applyHurtTint(true);
+        } else {
+            this.applyHurtTint(false);
+        }
+    }
+
+    private applyHurtTint(isHurt: boolean) {
+        this.group.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                const mat = object.material;
+                if (mat instanceof THREE.MeshLambertMaterial) {
+                    if (isHurt) {
+                        mat.emissive.setHex(0xff0000);
+                        mat.emissiveIntensity = 0.6; // Stronger red flash
+                    } else {
+                        mat.emissive.setHex(0x000000);
+                        mat.emissiveIntensity = 0;
+                    }
+                }
+            }
+        });
     }
 
     public applyTraits(color: THREE.Color, scale: number) {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Animal, AnimalState } from './Animal';
 import { PigModel } from './PigModel';
 import { World } from '../world/World';
+import { BlockType } from '../world/Block';
 
 export interface PigTraits {
     color: THREE.Color;
@@ -67,9 +68,27 @@ export class Pig extends Animal {
         return false;
     }
 
+    protected die(): void {
+        super.die();
+        // Pigs drop pork/meat when they die (BlockType.PORK if it exists, otherwise generic drop)
+        // For now, let's assume the EntityManager will handle the physical removal.
+        // We can trigger a specific sound or effect here if needed.
+    }
+
+    public getDrops(): { type: number, count: number }[] {
+        if (this.traits.isBaby) return [];
+        // Minecraft pigs drop 1-3 raw porkchops
+        const count = Math.floor(Math.random() * 3) + 1;
+        return [{ type: BlockType.PORK, count }];
+    }
+
     public update(delta: number, world: World, playerPos?: THREE.Vector3, isHoldingFood?: boolean): void {
         super.update(delta, world, playerPos, isHoldingFood);
         
+        if (this.hurtTimer > 0) {
+            this.hurtTimer -= delta;
+        }
+
         // Growth logic
         if (this.traits.isBaby) {
             // ...
@@ -92,6 +111,6 @@ export class Pig extends Animal {
             this.walkTime = 0;
         }
 
-        this.model.updateAnimation(delta, this.walkTime, isMoving, this.loveTimer > 0);
+        this.model.updateAnimation(delta, this.walkTime, isMoving, this.loveTimer > 0, this.hurtTimer);
     }
 }

@@ -103,7 +103,7 @@ export class Player {
         this.audioManager = new AudioManager(camera);
         this.audioManager.init();
 
-        this.entityManager = new EntityManager(scene, world, this.audioManager);
+        this.entityManager = new EntityManager(scene, world, this.audioManager, camera);
         
         // Add character model to scene
         scene.add(this.characterModel.group);
@@ -224,11 +224,20 @@ export class Player {
         const origin = this.camera.position;
         const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         
-        const entity = this.entityManager.intersectEntities(origin, direction, 4);
+        // Slightly increase range to 4.5
+        const entity = this.entityManager.intersectEntities(origin, direction, 4.5);
         if (entity) {
             this.hand.swing();
-            // TODO: Implement damage logic
-            this.audioManager.play('break'); 
+            
+            // Damage the entity (standard Minecraft hit is 1 HP by hand)
+            entity.takeDamage(1, this.position);
+            
+            // Play hurt sound
+            this.audioManager.play('hurt'); 
+            
+            // 增加精疲力竭度
+            this.stats.addExhaustion(0.1);
+            
             return true;
         }
         return false;

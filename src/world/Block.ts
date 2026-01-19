@@ -33,6 +33,9 @@ export enum BlockType {
     ROSE = 42,
     CARROT = 43,
 
+    // Items
+    PORK = 60,
+
     // Fluids
     WATER = 50,
 }
@@ -220,6 +223,17 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         isEdible: true,
         nutrition: 3,
         saturation: 2.4
+    },
+    [BlockType.PORK]: {
+        name: 'Raw Porkchop',
+        renderType: RenderType.CROSS, // Use cross for a flat-ish item look
+        isOpaque: false,
+        isSolid: false,
+        hardness: 0,
+        textures: { all: [13, 1] },
+        isEdible: true,
+        nutrition: 3,
+        saturation: 1.8
     },
     [BlockType.WATER]: {
         name: 'Water',

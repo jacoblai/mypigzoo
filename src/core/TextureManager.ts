@@ -260,6 +260,9 @@ export class TextureManager {
         drawCross(7, 2, '#4aad31', 'grass'); // Tall Grass
         drawCross(13, 0, '#fdd835', 'flower'); // Dandelion
         drawCross(12, 0, '#e53935', 'flower'); // Rose
+        
+        // Pork (13, 1)
+        this.drawPork(ctx, 13 * 16, 1 * 16);
 
         // Hand & Player
         this.drawSteveSkin(ctx, 8 * 16, 0);
@@ -331,6 +334,31 @@ export class TextureManager {
         fillRect(4, 38, 4, 6, pink);        // Front
         fillRect(8, 38, 4, 6, pink);        // Right
         fillRect(12, 38, 4, 6, pink);       // Back
+    }
+
+    private static drawPork(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
+        const porkColor = '#f48fb1';
+        const fatColor = '#ffffff';
+        const edgeColor = '#c2185b';
+
+        const fillRect = (x: number, y: number, w: number, h: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(offsetX + x, offsetY + y, w, h);
+        };
+
+        // Simple raw porkchop shape
+        fillRect(2, 4, 12, 8, porkColor);
+        fillRect(4, 2, 8, 12, porkColor);
+        
+        // Fat streaks
+        fillRect(4, 4, 2, 2, fatColor);
+        fillRect(10, 10, 2, 2, fatColor);
+        
+        // Darker edges
+        fillRect(2, 4, 1, 8, edgeColor);
+        fillRect(13, 4, 1, 8, edgeColor);
+        fillRect(4, 2, 8, 1, edgeColor);
+        fillRect(4, 13, 8, 1, edgeColor);
     }
 
     /**

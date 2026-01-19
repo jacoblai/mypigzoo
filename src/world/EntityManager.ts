@@ -15,12 +15,15 @@ export class EntityManager {
     private world: World;
     private textureAtlas: THREE.Texture | null = null;
     private audioManager: AudioManager;
+    private camera: THREE.Camera;
     private raycaster = new THREE.Raycaster();
+    private damageHearts: { mesh: THREE.Mesh, life: number }[] = [];
 
-    constructor(scene: THREE.Scene, world: World, audioManager: AudioManager) {
+    constructor(scene: THREE.Scene, world: World, audioManager: AudioManager, camera: THREE.Camera) {
         this.scene = scene;
         this.world = world;
         this.audioManager = audioManager;
+        this.camera = camera;
         
         // Use the common texture from TextureManager
         this.textureAtlas = TextureManager.getMaterial().map;
@@ -40,15 +43,12 @@ export class EntityManager {
         const intersects = this.raycaster.intersectObjects(meshes, true);
 
         if (intersects.length > 0) {
-            // Find which entity owns this mesh
-            const hitMesh = intersects[0].object;
-            return this.entities.find(e => {
-                let found = false;
-                e.mesh.traverse(obj => {
-                    if (obj === hitMesh) found = true;
-                });
-                return found;
-            }) || null;
+            // Find which entity owns this mesh using userData link
+            let obj: THREE.Object3D | null = intersects[0].object;
+            while (obj) {
+                if (obj.userData.entity) return obj.userData.entity;
+                obj = obj.parent;
+            }
         }
         return null;
     }
@@ -57,6 +57,17 @@ export class EntityManager {
         const pig = new Pig(x, y, z, traits);
         this.entities.push(pig);
         this.scene.add(pig.mesh);
+        
+        // Link meshes to entity for faster lookup
+        pig.mesh.traverse(obj => {
+            obj.userData.entity = pig;
+        });
+        
+        // Set damage callback
+        pig.onDamage = (amount, pos) => {
+            this.spawnDamageHeart(pig.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
+        };
+        
         return pig;
     }
 
@@ -68,14 +79,99 @@ export class EntityManager {
         this.scene.add(drop.mesh);
     }
 
+    public spawnDamageHeart(position: THREE.Vector3) {
+        const heartGeom = new THREE.PlaneGeometry(0.4, 0.4);
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d')!;
+        
+        // Draw a simple Minecraft-style red heart
+        ctx.fillStyle = '#ff0000';
+        // Left lobe
+        ctx.fillRect(8, 16, 24, 24);
+        // Right lobe
+        ctx.fillRect(32, 16, 24, 24);
+        // Bottom part
+        ctx.fillRect(16, 40, 32, 8);
+        ctx.fillRect(24, 48, 16, 8);
+        // Top rounding
+        ctx.clearRect(8, 16, 8, 8);
+        ctx.clearRect(48, 16, 8, 8);
+        ctx.clearRect(24, 16, 16, 8);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const heartMat = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true, 
+            side: THREE.DoubleSide,
+            depthTest: false // Ensure it's always visible over the entity
+        });
+
+        const heart = new THREE.Mesh(heartGeom, heartMat);
+        heart.renderOrder = 999;
+        heart.position.copy(position);
+        // Initial billboard
+        heart.quaternion.copy(this.camera.quaternion);
+        
+        this.scene.add(heart);
+        this.damageHearts.push({ mesh: heart, life: 1.0 });
+    }
+
     public update(delta: number, playerPosition: THREE.Vector3, inventory: Inventory) {
         // Check if player is holding pig food (carrot)
         const selected = inventory.getSelectedSlot();
         const isHoldingPigFood = selected ? selected.type === BlockType.CARROT : false;
 
+        // Update damage hearts
+        for (let i = this.damageHearts.length - 1; i >= 0; i--) {
+            const heart = this.damageHearts[i];
+            heart.life -= delta;
+            
+            // Float up
+            heart.mesh.position.y += delta * 1.5;
+            
+            // Billboard effect: face camera
+            heart.mesh.quaternion.copy(this.camera.quaternion);
+            
+            // Fade out
+            if (heart.mesh.material instanceof THREE.MeshBasicMaterial) {
+                heart.mesh.material.opacity = heart.life;
+            }
+
+            if (heart.life <= 0) {
+                this.scene.remove(heart.mesh);
+                heart.mesh.geometry.dispose();
+                (heart.mesh.material as THREE.Material).dispose();
+                this.damageHearts.splice(i, 1);
+            }
+        }
+
         // Update generic entities
         for (let i = this.entities.length - 1; i >= 0; i--) {
             const entity = this.entities[i];
+            
+            if (entity.isDead) {
+                // Spawn drops
+                const drops = entity.getDrops();
+                for (const drop of drops) {
+                    for (let n = 0; n < drop.count; n++) {
+                        // Offset each drop slightly
+                        const offset = new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            0.2,
+                            (Math.random() - 0.5) * 0.5
+                        );
+                        this.spawnDrop(drop.type, entity.position.clone().add(offset));
+                    }
+                }
+
+                entity.dispose();
+                this.scene.remove(entity.mesh);
+                this.entities.splice(i, 1);
+                continue;
+            }
+
             if (entity instanceof Pig) {
                 entity.update(delta, this.world, playerPosition, isHoldingPigFood);
             } else {
