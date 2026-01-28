@@ -71,12 +71,13 @@ export class EntityManager {
         return pig;
     }
 
-    public spawnDrop(type: BlockType, position: THREE.Vector3) {
-        if (type === BlockType.AIR || !this.textureAtlas) return;
+    public spawnDrop(type: BlockType, position: THREE.Vector3): boolean {
+        if (type === BlockType.AIR || type === BlockType.WATER || !this.textureAtlas) return false;
         
         const drop = new DroppedItem(type, position, this.textureAtlas);
         this.droppedItems.push(drop);
         this.scene.add(drop.mesh);
+        return true;
     }
 
     public spawnDamageHeart(position: THREE.Vector3) {
@@ -246,10 +247,9 @@ export class EntityManager {
     private removeDrop(index: number) {
         const item = this.droppedItems[index];
         this.scene.remove(item.mesh);
-        item.mesh.geometry.dispose();
-        if (Array.isArray(item.mesh.material)) {
-            item.mesh.material.forEach(m => m.dispose());
-        } else {
+        if (item.mesh.material) {
+            const map = item.mesh.material.map;
+            if (map) map.dispose();
             item.mesh.material.dispose();
         }
         this.droppedItems.splice(index, 1);

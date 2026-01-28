@@ -220,6 +220,22 @@ export class Player {
         this.placeBlock();
     }
 
+    private dropSelectedItem() {
+        const selected = this.inventory.getSelectedSlot();
+        if (!selected || selected.count <= 0) return;
+        if (selected.type === BlockType.WATER) return;
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        const spawnPos = this.camera.position.clone().add(forward.multiplyScalar(0.8));
+        const spawned = this.entityManager.spawnDrop(selected.type, spawnPos);
+        if (!spawned) return;
+
+        this.inventory.consumeSelected(1);
+        this.inventoryUI.update();
+        this.updateHand();
+        this.audioManager.play('place');
+    }
+
     private handleAttack(): boolean {
         const origin = this.camera.position;
         const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -300,6 +316,9 @@ export class Player {
             case 'KeyR':
                 this.hand.swing();
                 this.handleInteraction();
+                break;
+            case 'KeyQ':
+                this.dropSelectedItem();
                 break;
             case 'KeyF':
                 if (!this.handleAttack()) {
