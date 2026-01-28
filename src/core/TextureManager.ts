@@ -264,6 +264,11 @@ export class TextureManager {
         // Pork (13, 1)
         this.drawPork(ctx, 13 * 16, 1 * 16);
 
+        // Tools & Materials
+        this.drawStick(ctx, 6 * 16, 0 * 16);
+        this.drawPickaxe(ctx, 6 * 16, 1 * 16, '#a9825a', '#6d4c41'); // Wooden Pickaxe
+        this.drawPickaxe(ctx, 6 * 16, 2 * 16, '#9e9e9e', '#6d4c41'); // Stone Pickaxe
+
         // Hand & Player
         this.drawSteveSkin(ctx, 8 * 16, 0);
         
@@ -359,6 +364,48 @@ export class TextureManager {
         fillRect(13, 4, 1, 8, edgeColor);
         fillRect(4, 2, 8, 1, edgeColor);
         fillRect(4, 13, 8, 1, edgeColor);
+    }
+
+    private static drawStick(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
+        const main = '#8d6e63';
+        const highlight = '#a9825a';
+        const shadow = '#5d4037';
+
+        const fillRect = (x: number, y: number, w: number, h: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(offsetX + x, offsetY + y, w, h);
+        };
+
+        // Simple vertical stick with highlight
+        fillRect(7, 2, 2, 12, main);
+        fillRect(7, 2, 1, 12, highlight);
+        fillRect(8, 2, 1, 12, shadow);
+    }
+
+    private static drawPickaxe(
+        ctx: CanvasRenderingContext2D,
+        offsetX: number,
+        offsetY: number,
+        headColor: string,
+        handleColor: string
+    ) {
+        const headShadow = '#6f6f6f';
+        const handleHighlight = '#a9825a';
+
+        const fillRect = (x: number, y: number, w: number, h: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(offsetX + x, offsetY + y, w, h);
+        };
+
+        // Pickaxe head
+        fillRect(2, 3, 12, 2, headColor);
+        fillRect(2, 5, 12, 1, headShadow);
+        fillRect(4, 6, 2, 2, headColor);
+        fillRect(10, 6, 2, 2, headColor);
+
+        // Handle
+        fillRect(7, 5, 2, 9, handleColor);
+        fillRect(7, 5, 1, 9, handleHighlight);
     }
 
     /**

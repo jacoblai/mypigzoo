@@ -405,8 +405,10 @@ export class Player {
         const hardness = blockData?.hardness ?? 0.2;
         
         if (hardness < 0) return; // Bedrock or unbreakable
+        const tool = this.inventory.getSelectedSlot()?.type ?? null;
+        const speedMultiplier = this.getMiningSpeedMultiplier(tool, voxel);
         
-        this.miningProgress += delta;
+        this.miningProgress += delta * speedMultiplier;
 
         if (this.miningProgress >= hardness) {
             this.performDestroyBlock(hit.position, voxel);
@@ -445,6 +447,7 @@ export class Player {
             this.audioManager.play('step'); // 暂时用 step 音效代替吃东西
             return;
         }
+        if (blockData?.isPlaceable === false) return;
 
         const hit = this.selectionBox.update();
         if (hit) {
@@ -470,6 +473,31 @@ export class Player {
             
             this.audioManager.play('place');
         }
+    }
+
+    private getMiningSpeedMultiplier(tool: BlockType | null, target: BlockType): number {
+        if (!tool) return 1;
+        if (!this.isStoneLike(target)) return 1;
+
+        switch (tool) {
+            case BlockType.WOODEN_PICKAXE:
+                return 2.0;
+            case BlockType.STONE_PICKAXE:
+                return 4.0;
+            default:
+                return 1;
+        }
+    }
+
+    private isStoneLike(type: BlockType): boolean {
+        return (
+            type === BlockType.STONE ||
+            type === BlockType.COBBLESTONE ||
+            type === BlockType.COAL_ORE ||
+            type === BlockType.IRON_ORE ||
+            type === BlockType.GOLD_ORE ||
+            type === BlockType.DIAMOND_ORE
+        );
     }
 
     public update(delta: number) {

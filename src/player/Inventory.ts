@@ -73,6 +73,31 @@ export class Inventory {
         return remaining;
     }
 
+    public canAddItem(type: BlockType, count: number = 1): boolean {
+        if (type === BlockType.AIR) return true;
+
+        let remaining = count;
+
+        for (let i = 0; i < Inventory.TOTAL_SIZE; i++) {
+            const slot = this.slots[i];
+            if (slot && slot.type === type && slot.count < Inventory.MAX_STACK) {
+                const addable = Math.min(remaining, Inventory.MAX_STACK - slot.count);
+                remaining -= addable;
+                if (remaining <= 0) return true;
+            }
+        }
+
+        for (let i = 0; i < Inventory.TOTAL_SIZE; i++) {
+            if (this.slots[i] === null) {
+                const addable = Math.min(remaining, Inventory.MAX_STACK);
+                remaining -= addable;
+                if (remaining <= 0) return true;
+            }
+        }
+
+        return remaining <= 0;
+    }
+
     /**
      * Removes items from the current selected slot.
      */

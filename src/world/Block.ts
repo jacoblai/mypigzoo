@@ -35,6 +35,9 @@ export enum BlockType {
 
     // Items
     PORK = 60,
+    STICK = 61,
+    WOODEN_PICKAXE = 62,
+    STONE_PICKAXE = 63,
 
     // Fluids
     WATER = 50,
@@ -53,6 +56,7 @@ export interface BlockData {
     isOpaque: boolean;
     isSolid: boolean; // 新增：是否具有物理碰撞
     hardness: number;
+    isPlaceable?: boolean;
     // Texture coordinates in the 16x16 grid [x, y]
     textures: {
         all?: [number, number];
@@ -234,6 +238,33 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         isEdible: true,
         nutrition: 3,
         saturation: 1.8
+    },
+    [BlockType.STICK]: {
+        name: 'Stick',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        isSolid: false,
+        hardness: 0,
+        isPlaceable: false,
+        textures: { all: [6, 0] }
+    },
+    [BlockType.WOODEN_PICKAXE]: {
+        name: 'Wooden Pickaxe',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        isSolid: false,
+        hardness: 0,
+        isPlaceable: false,
+        textures: { all: [6, 1] }
+    },
+    [BlockType.STONE_PICKAXE]: {
+        name: 'Stone Pickaxe',
+        renderType: RenderType.CROSS,
+        isOpaque: false,
+        isSolid: false,
+        hardness: 0,
+        isPlaceable: false,
+        textures: { all: [6, 2] }
     },
     [BlockType.WATER]: {
         name: 'Water',
