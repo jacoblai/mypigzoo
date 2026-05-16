@@ -61,6 +61,10 @@ export class Player {
     private swingTimer = 0;
     private readonly SWING_INTERVAL = 0.25;
 
+    private sneakKeyHeld = false;
+    /** 潜行动画平滑 [0,1]，与按下 Shift / 顶棚强制蹲姿同步 */
+    private squatVisualSmooth = 0;
+
     constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement, scene: THREE.Scene, world: World) {
         this.world = world;
         this.camera = camera;
@@ -121,14 +125,14 @@ export class Player {
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
         window.addEventListener('resize', () => this.hand.onResize());
 
-        window.addEventListener('inventory-changed', () => {
+        this.inventory.subscribe(() => {
             this.updateHand();
             this.inventoryUI.update();
         });
 
         this.controls.addEventListener('lock', () => {
-            this.isInventoryOpen = false;
-            this.inventoryUI.toggle(false);
+            if (!this.isInventoryOpen) return;
+            this.closeUI(false);
         });
 
         this.controls.addEventListener('unlock', () => {
@@ -144,7 +148,7 @@ export class Player {
         this.hand.setBlock(selected ? selected.type : BlockType.AIR);
     }
 
-    public spawn(x: number, y: number, z: number) {
+    public spawn(x: number, _y: number, z: number) {
         // 1. 居中出生点位置
         const centerX = Math.floor(x) + 0.5;
         const centerZ = Math.floor(z) + 0.5;
@@ -152,14 +156,18 @@ export class Player {
         // 2. 获取地面高度 (寻找最高非空气方块)
         let groundY = this.world.getHighestSolidBlock(centerX, centerZ);
         
-        // 3. 安全重生机制：确保出生点上方有 2 格空气，防止陷入方块
+        // 3. 安全重生：与玩家碰撞盒所占体素层一致，整列必须为空气
         while (groundY < 128) {
-            const blockFoot = this.world.getVoxel(centerX, groundY, centerZ);
-            const blockHead = this.world.getVoxel(centerX, groundY + 1, centerZ);
-            
-            if (blockFoot === BlockType.AIR && blockHead === BlockType.AIR) {
-                break;
+            const feetY = groundY + 0.1;
+            const ys = Physics.playerOccupiedBlockYs(feetY, Physics.PLAYER_HEIGHT);
+            let clear = true;
+            for (const by of ys) {
+                if (this.world.getVoxel(centerX, by, centerZ) !== BlockType.AIR) {
+                    clear = false;
+                    break;
+                }
             }
+            if (clear) break;
             groundY++;
         }
 
@@ -214,6 +222,10 @@ export class Player {
                     this.audioManager.play('step');
                 }
             }
+        }
+
+        if (this.tryOpenWorkbench()) {
+            return;
         }
 
         // 2. Fallback to block placement
@@ -278,15 +290,48 @@ export class Player {
     }
 
     private toggleInventory() {
-        this.isInventoryOpen = !this.isInventoryOpen;
         if (this.isInventoryOpen) {
-            this.controls.unlock();
-            this.inventoryUI.toggle(true);
-            this.resetMining();
-        } else {
-            this.controls.lock();
-            this.inventoryUI.toggle(false);
+            this.closeUI(true);
+            return;
         }
+
+        this.openInventory();
+    }
+
+    private openInventory() {
+        this.isInventoryOpen = true;
+        this.inventoryUI.setInventoryCraftingMode();
+        this.controls.unlock();
+        this.inventoryUI.toggle(true);
+        this.resetMining();
+    }
+
+    private openWorkbench() {
+        this.isInventoryOpen = true;
+        this.inventoryUI.setWorkbenchCraftingMode();
+        this.controls.unlock();
+        this.inventoryUI.toggle(true);
+        this.resetMining();
+    }
+
+    private closeUI(shouldLockControls: boolean) {
+        this.isInventoryOpen = false;
+        this.inventoryUI.setInventoryCraftingMode();
+        this.inventoryUI.toggle(false);
+        if (shouldLockControls) {
+            this.controls.lock();
+        }
+    }
+
+    private tryOpenWorkbench(): boolean {
+        const hit = this.selectionBox.update();
+        if (!hit) return false;
+
+        const targetType = this.world.getVoxel(hit.position.x, hit.position.y, hit.position.z);
+        if (targetType !== BlockType.CRAFTING_TABLE) return false;
+
+        this.openWorkbench();
+        return true;
     }
 
     private onKeyDown(event: KeyboardEvent) {
@@ -335,6 +380,10 @@ export class Player {
             case 'Digit7': this.selectSlot(6); break;
             case 'Digit8': this.selectSlot(7); break;
             case 'Digit9': this.selectSlot(8); break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                this.sneakKeyHeld = true;
+                break;
             case 'KeyC':
                 this.isThirdPerson = !this.isThirdPerson;
                 break;
@@ -367,6 +416,10 @@ export class Player {
             case 'KeyK': this.lookDown = false; break;
             case 'KeyJ': this.lookLeft = false; break;
             case 'KeyL': this.lookRight = false; break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                this.sneakKeyHeld = false;
+                break;
         }
     }
 
@@ -456,11 +509,9 @@ export class Player {
             // 碰撞检测：防止在玩家自己身体所在位置放置方块
             const playerX = Math.floor(this.position.x);
             const playerZ = Math.floor(this.position.z);
-            const playerY_low = Math.floor(this.position.y);
-            const playerY_high = Math.floor(this.position.y + Physics.PLAYER_HEIGHT * 0.9);
+            const occupiedYs = Physics.playerOccupiedBlockYs(this.position.y, Physics.PLAYER_HEIGHT);
 
-            if (placePos.x === playerX && placePos.z === playerZ && 
-                (placePos.y === playerY_low || placePos.y === playerY_high)) {
+            if (placePos.x === playerX && placePos.z === playerZ && occupiedYs.includes(placePos.y)) {
                 return;
             }
             
@@ -553,8 +604,20 @@ export class Player {
         // 记录更新前的垂直速度用于计算坠落伤害
         this.lastVelocityY = this.velocity.y;
 
+        const bodyClipsStanding = Physics.playerBodyColliding(
+            this.world,
+            this.position,
+            Physics.PLAYER_RADIUS,
+            Physics.PLAYER_HEIGHT
+        );
+        const useSneakStance = this.sneakKeyHeld || bodyClipsStanding;
+        const poseHeight = useSneakStance ? Physics.PLAYER_SNEAK_HEIGHT : Physics.PLAYER_HEIGHT;
+        const sneakTargetVisual = bodyClipsStanding || this.sneakKeyHeld ? 1 : 0;
+        this.squatVisualSmooth +=
+            (sneakTargetVisual - this.squatVisualSmooth) * Math.min(delta * 14, 1);
+
         // 2. 输入转换为速度
-        const moveSpeed = 45.0;
+        const moveSpeed = 45.0 * (useSneakStance ? Physics.PLAYER_SNEAK_MOVE_FACTOR : 1);
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         forward.y = 0;
         forward.normalize();
@@ -567,7 +630,31 @@ export class Player {
 
         // 3. 物理决议
         const oldPos = this.position.clone();
-        const result = Physics.collide(this.world, this.position, this.velocity, delta);
+        const result = Physics.collide(
+            this.world,
+            this.position,
+            this.velocity,
+            delta,
+            Physics.PLAYER_RADIUS,
+            poseHeight
+        );
+
+        if (
+            useSneakStance &&
+            result.isGrounded &&
+            !Physics.feetHaveEnoughSupport(
+                this.world,
+                result.position.x,
+                result.position.z,
+                result.position.y,
+                Physics.PLAYER_RADIUS
+            )
+        ) {
+            result.position.x = oldPos.x;
+            result.position.z = oldPos.z;
+            result.velocity.x = 0;
+            result.velocity.z = 0;
+        }
         
         // 坠落伤害检测
         if (result.isGrounded && !this.canJump) {
@@ -603,8 +690,9 @@ export class Player {
                 const checkX = this.position.x + moveDir.x * checkDist;
                 const checkZ = this.position.z + moveDir.z * checkDist;
                 
-                const kneeBlock = this.world.getVoxel(checkX, this.position.y + 0.5, checkZ);
-                const headBlock = this.world.getVoxel(checkX, this.position.y + 1.5, checkZ);
+                const h = poseHeight;
+                const kneeBlock = this.world.getVoxel(checkX, this.position.y + h * 0.25, checkZ);
+                const headBlock = this.world.getVoxel(checkX, this.position.y + h * 0.75, checkZ);
                 
                 // 如果前方脚下有方块且头顶没方块，则执行跳跃
                 if (kneeBlock !== BlockType.AIR && headBlock === BlockType.AIR) {
@@ -652,14 +740,22 @@ export class Player {
         
         // Pass camera pitch to character model
         const headPitch = this.camera.rotation.x;
-        this.characterModel.updateAnimation(this.walkTime, isActuallyMoving, headPitch);
+        this.characterModel.updateAnimation(
+            this.walkTime,
+            isActuallyMoving,
+            headPitch,
+            this.squatVisualSmooth
+        );
     }
 
     private updateCameraPosition() {
+        const eyeY =
+            THREE.MathUtils.lerp(Physics.EYE_HEIGHT, Physics.PLAYER_SNEAK_EYE_HEIGHT, this.squatVisualSmooth);
+
         if (!this.isThirdPerson) {
             // 第一人称视角
             this.camera.position.copy(this.position);
-            this.camera.position.y += Physics.EYE_HEIGHT;
+            this.camera.position.y += eyeY;
             
             // 隐藏头和身体，避免穿模
             this.characterModel.head.visible = false;
@@ -668,7 +764,7 @@ export class Player {
             // 第三人称视角（背视）
             const camDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.camera.quaternion);
             const targetPos = this.position.clone();
-            targetPos.y += Physics.EYE_HEIGHT + 0.5; // 稍微抬高视点，防止被肩膀遮挡
+            targetPos.y += eyeY + 0.5; // 稍微抬高视点，防止被肩膀遮挡
             
             // 相机向后偏移 5 个单位 (增加距离以看清全貌)
             const offset = camDir.multiplyScalar(5);

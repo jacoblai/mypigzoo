@@ -16,7 +16,8 @@ export interface CraftingMatch {
 }
 
 export class CraftingSystem {
-    public static readonly GRID_SIZE = 3;
+    public static readonly INVENTORY_GRID_SIZE = 2;
+    public static readonly WORKBENCH_GRID_SIZE = 3;
 
     private static readonly recipes: CraftingRecipe[] = [
         {
@@ -30,6 +31,15 @@ export class CraftingSystem {
             height: 2,
             pattern: [BlockType.PLANKS, BlockType.PLANKS],
             output: { type: BlockType.STICK, count: 4 }
+        },
+        {
+            width: 2,
+            height: 2,
+            pattern: [
+                BlockType.PLANKS, BlockType.PLANKS,
+                BlockType.PLANKS, BlockType.PLANKS
+            ],
+            output: { type: BlockType.CRAFTING_TABLE, count: 1 }
         },
         {
             width: 3,
@@ -53,18 +63,20 @@ export class CraftingSystem {
         }
     ];
 
-    public static findMatch(grid: (InventoryItem | null)[]): CraftingMatch | null {
-        if (grid.length !== this.GRID_SIZE * this.GRID_SIZE) return null;
+    public static findMatch(grid: (InventoryItem | null)[], gridSize: number): CraftingMatch | null {
+        if (grid.length !== gridSize * gridSize) return null;
 
         const gridTypes = grid.map(item => item?.type ?? null);
 
         for (const recipe of this.recipes) {
-            const maxOffsetX = this.GRID_SIZE - recipe.width;
-            const maxOffsetY = this.GRID_SIZE - recipe.height;
+            if (recipe.width > gridSize || recipe.height > gridSize) continue;
+
+            const maxOffsetX = gridSize - recipe.width;
+            const maxOffsetY = gridSize - recipe.height;
 
             for (let offsetY = 0; offsetY <= maxOffsetY; offsetY++) {
                 for (let offsetX = 0; offsetX <= maxOffsetX; offsetX++) {
-                    const match = this.matchAt(gridTypes, recipe, offsetX, offsetY);
+                    const match = this.matchAt(gridTypes, gridSize, recipe, offsetX, offsetY);
                     if (match) {
                         return { output: { ...recipe.output }, consumeIndices: match };
                     }
@@ -77,15 +89,16 @@ export class CraftingSystem {
 
     private static matchAt(
         grid: (BlockType | null)[],
+        gridSize: number,
         recipe: CraftingRecipe,
         offsetX: number,
         offsetY: number
     ): number[] | null {
         const consumeIndices: number[] = [];
 
-        for (let y = 0; y < this.GRID_SIZE; y++) {
-            for (let x = 0; x < this.GRID_SIZE; x++) {
-                const gridIndex = y * this.GRID_SIZE + x;
+        for (let y = 0; y < gridSize; y++) {
+            for (let x = 0; x < gridSize; x++) {
+                const gridIndex = y * gridSize + x;
                 const gridType = grid[gridIndex];
 
                 const inRecipeArea =

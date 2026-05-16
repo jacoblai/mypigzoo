@@ -18,7 +18,12 @@ export class InventoryUI {
     private container: HTMLElement;
     private cursorItem: InventoryItem | null = null;
     private cursorSource: SlotRef | null = null;
-    private craftingSlots: (InventoryItem | null)[] = new Array(CraftingSystem.GRID_SIZE * CraftingSystem.GRID_SIZE).fill(null);
+    private craftingSlots: (InventoryItem | null)[] = new Array(
+        CraftingSystem.INVENTORY_GRID_SIZE * CraftingSystem.INVENTORY_GRID_SIZE
+    ).fill(null);
+    private craftingGridSize: number = CraftingSystem.INVENTORY_GRID_SIZE;
+    private craftingGridElement!: HTMLElement;
+    private craftingLabelElement!: HTMLElement;
     private craftingOutputElement!: HTMLElement;
     private lastClickTime = 0;
     private lastClickSlot: SlotRef | null = null;
@@ -115,7 +120,6 @@ export class InventoryUI {
             }
             .crafting-grid {
                 display: grid;
-                grid-template-columns: repeat(3, 1fr);
                 gap: 5px;
             }
             .crafting-output {
@@ -152,17 +156,15 @@ export class InventoryUI {
         craftingLabel.className = 'inventory-label';
         craftingLabel.innerText = '合成';
         inv.appendChild(craftingLabel);
+        this.craftingLabelElement = craftingLabel;
 
         const craftingContainer = document.createElement('div');
         craftingContainer.className = 'crafting-container';
 
-        const craftingGrid = document.createElement('div');
-        craftingGrid.className = 'crafting-grid';
-        for (let i = 0; i < CraftingSystem.GRID_SIZE * CraftingSystem.GRID_SIZE; i++) {
-            const slot = this.createSlotElement(i, 'crafting');
-            craftingGrid.appendChild(slot);
-        }
-        craftingContainer.appendChild(craftingGrid);
+        this.craftingGridElement = document.createElement('div');
+        this.craftingGridElement.className = 'crafting-grid';
+        this.rebuildCraftingGrid();
+        craftingContainer.appendChild(this.craftingGridElement);
 
         const arrow = document.createElement('div');
         arrow.className = 'crafting-arrow';
@@ -222,20 +224,15 @@ export class InventoryUI {
         e.preventDefault();
         const isRightClick = e.button === 2 || (e.button === 0 && e.ctrlKey);
         const isLeftClick = e.button === 0;
-        let inventoryChanged = false;
 
         if (isLeftClick && e.shiftKey && this.cursorItem === null) {
-            if (this.handleShiftMove(slot)) {
-                window.dispatchEvent(new CustomEvent('inventory-changed'));
-            }
+            this.handleShiftMove(slot);
             this.update();
             return;
         }
 
         if (isLeftClick && this.cursorItem === null && this.isDoubleClick(slot)) {
-            if (this.mergeStacks(slot)) {
-                window.dispatchEvent(new CustomEvent('inventory-changed'));
-            }
+            this.mergeStacks(slot);
             this.update();
             return;
         }
@@ -256,7 +253,6 @@ export class InventoryUI {
                 this.setSlotItem(slot, { type: targetItem.type, count: targetItem.count - takeCount });
             }
 
-            inventoryChanged = slot.kind === 'inventory';
             this.update();
         } else {
             if (isRightClick) {
@@ -291,12 +287,7 @@ export class InventoryUI {
                 this.cursorSource = null;
             }
 
-            inventoryChanged = slot.kind === 'inventory';
             this.update();
-        }
-
-        if (inventoryChanged) {
-            window.dispatchEvent(new CustomEvent('inventory-changed'));
         }
     }
 
@@ -310,6 +301,14 @@ export class InventoryUI {
         this.restoreCursorItem();
         this.returnCraftingItems();
         this.update();
+    }
+
+    public setInventoryCraftingMode() {
+        this.setCraftingMode(CraftingSystem.INVENTORY_GRID_SIZE, '合成');
+    }
+
+    public setWorkbenchCraftingMode() {
+        this.setCraftingMode(CraftingSystem.WORKBENCH_GRID_SIZE, '工作台');
     }
 
     public update() {
@@ -367,7 +366,7 @@ export class InventoryUI {
 
     private updateCraftingOutput() {
         this.updateSlotContent(this.craftingOutputElement, null);
-        const match = CraftingSystem.findMatch(this.craftingSlots);
+        const match = CraftingSystem.findMatch(this.craftingSlots, this.craftingGridSize);
         if (!match) return;
         this.updateSlotContent(this.craftingOutputElement, match.output);
     }
@@ -376,7 +375,7 @@ export class InventoryUI {
         e.preventDefault();
         if (this.cursorItem) return;
 
-        const match = CraftingSystem.findMatch(this.craftingSlots);
+        const match = CraftingSystem.findMatch(this.craftingSlots, this.craftingGridSize);
         if (!match) return;
 
         if (!this.inventory.canAddItem(match.output.type, match.output.count)) return;
@@ -384,7 +383,6 @@ export class InventoryUI {
         this.inventory.addItem(match.output.type, match.output.count);
         this.consumeCraftingInputs(match);
         this.update();
-        window.dispatchEvent(new CustomEvent('inventory-changed'));
     }
 
     private consumeCraftingInputs(match: CraftingMatch) {
@@ -460,7 +458,6 @@ export class InventoryUI {
                 this.craftingSlots[i] = { type: item.type, count: remaining };
             }
         }
-        window.dispatchEvent(new CustomEvent('inventory-changed'));
     }
 
     private canPlaceAllInSlot(slot: SlotRef, item: InventoryItem): boolean {
@@ -472,10 +469,11 @@ export class InventoryUI {
 
     private isDoubleClick(slot: SlotRef): boolean {
         const now = Date.now();
-        const isSameSlot =
+        const isSameSlot = !!(
             this.lastClickSlot &&
             this.lastClickSlot.kind === slot.kind &&
-            this.lastClickSlot.index === slot.index;
+            this.lastClickSlot.index === slot.index
+        );
         return isSameSlot && now - this.lastClickTime <= 250;
     }
 
@@ -596,9 +594,29 @@ export class InventoryUI {
     }
 
     private getCraftingIndices(): number[] {
-        return Array.from(
-            { length: CraftingSystem.GRID_SIZE * CraftingSystem.GRID_SIZE },
-            (_, i) => i
-        );
+        return Array.from({ length: this.craftingSlots.length }, (_, i) => i);
+    }
+
+    private setCraftingMode(size: number, label: string) {
+        if (this.craftingGridSize === size) {
+            this.craftingLabelElement.innerText = label;
+            return;
+        }
+
+        this.returnCraftingItems();
+        this.craftingGridSize = size;
+        this.craftingSlots = new Array(size * size).fill(null);
+        this.craftingLabelElement.innerText = label;
+        this.rebuildCraftingGrid();
+        this.update();
+    }
+
+    private rebuildCraftingGrid() {
+        this.craftingGridElement.innerHTML = '';
+        this.craftingGridElement.style.gridTemplateColumns = `repeat(${this.craftingGridSize}, 1fr)`;
+        for (let i = 0; i < this.craftingSlots.length; i++) {
+            const slot = this.createSlotElement(i, 'crafting');
+            this.craftingGridElement.appendChild(slot);
+        }
     }
 }

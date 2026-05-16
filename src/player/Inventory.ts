@@ -13,6 +13,7 @@ export class Inventory {
 
     private slots: (InventoryItem | null)[] = new Array(Inventory.TOTAL_SIZE).fill(null);
     private selectedIndex: number = 0;
+    private changeListeners: Set<() => void> = new Set();
 
     constructor() {
         // Start with an empty inventory
@@ -28,16 +29,20 @@ export class Inventory {
 
     public select(index: number) {
         if (index >= 0 && index < Inventory.HOTBAR_SIZE) {
+            if (this.selectedIndex === index) return;
             this.selectedIndex = index;
+            this.emitChange();
         }
     }
 
     public next() {
         this.selectedIndex = (this.selectedIndex + 1) % Inventory.HOTBAR_SIZE;
+        this.emitChange();
     }
 
     public prev() {
         this.selectedIndex = (this.selectedIndex - 1 + Inventory.HOTBAR_SIZE) % Inventory.HOTBAR_SIZE;
+        this.emitChange();
     }
 
     /**
@@ -48,6 +53,7 @@ export class Inventory {
         if (type === BlockType.AIR) return 0;
 
         let remaining = count;
+        let changed = false;
 
         // 1. Try to stack in existing slots
         for (let i = 0; i < Inventory.TOTAL_SIZE; i++) {
@@ -56,7 +62,11 @@ export class Inventory {
                 const addable = Math.min(remaining, Inventory.MAX_STACK - slot.count);
                 slot.count += addable;
                 remaining -= addable;
-                if (remaining <= 0) return 0;
+                changed = true;
+                if (remaining <= 0) {
+                    this.emitChange();
+                    return 0;
+                }
             }
         }
 
@@ -66,10 +76,15 @@ export class Inventory {
                 const addable = Math.min(remaining, Inventory.MAX_STACK);
                 this.slots[i] = { type, count: addable };
                 remaining -= addable;
-                if (remaining <= 0) return 0;
+                changed = true;
+                if (remaining <= 0) {
+                    this.emitChange();
+                    return 0;
+                }
             }
         }
 
+        if (changed) this.emitChange();
         return remaining;
     }
 
@@ -109,6 +124,7 @@ export class Inventory {
         if (slot.count <= 0) {
             this.slots[this.selectedIndex] = null;
         }
+        this.emitChange();
         return true;
     }
 
@@ -119,6 +135,7 @@ export class Inventory {
     public setSlot(index: number, item: InventoryItem | null) {
         if (index >= 0 && index < Inventory.TOTAL_SIZE) {
             this.slots[index] = item;
+            this.emitChange();
         }
     }
 
@@ -126,5 +143,19 @@ export class Inventory {
         const temp = this.slots[indexA];
         this.slots[indexA] = this.slots[indexB];
         this.slots[indexB] = temp;
+        this.emitChange();
+    }
+
+    public subscribe(listener: () => void): () => void {
+        this.changeListeners.add(listener);
+        return () => {
+            this.changeListeners.delete(listener);
+        };
+    }
+
+    private emitChange() {
+        for (const listener of this.changeListeners) {
+            listener();
+        }
     }
 }

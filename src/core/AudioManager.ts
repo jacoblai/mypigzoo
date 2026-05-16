@@ -3,12 +3,10 @@ import * as THREE from 'three';
 export class AudioManager {
     private listener: THREE.AudioListener;
     private sounds: Map<string, THREE.Audio> = new Map();
-    private audioLoader: THREE.AudioLoader;
 
     constructor(camera: THREE.PerspectiveCamera) {
         this.listener = new THREE.AudioListener();
         camera.add(this.listener);
-        this.audioLoader = new THREE.AudioLoader();
     }
 
     /**

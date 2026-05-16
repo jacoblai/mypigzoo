@@ -45,9 +45,6 @@ export class CommandSystem {
             let spawnPos = context.position.clone();
             const forward = context.direction.clone();
             
-            // Try to find ground using raycast
-            const hit = context.world.getVoxel(context.position.x, context.position.y, context.position.z);
-            
             // Spawn 3 blocks in front, but keep at player's height or ground height
             const horizontalForward = forward.clone().setY(0).normalize();
             spawnPos.add(horizontalForward.multiplyScalar(3));
@@ -108,7 +105,6 @@ export class CommandSystem {
         }
 
         inventory.addItem(targetType, amount);
-        window.dispatchEvent(new CustomEvent('inventory-changed'));
 
         return `Gave ${amount} [${BLOCK_DATA[targetType].name}] to ${selector === '@a' ? 'all players' : 'player'}`;
     }

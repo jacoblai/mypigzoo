@@ -111,28 +111,78 @@ export class CharacterModel {
         return geom;
     }
 
-    public updateAnimation(walkTime: number, isMoving: boolean, headPitch: number = 0) {
-        this.headGroup.rotation.x = headPitch;
+    /** squatAmount ∈ [0,1]，潜行蹲下（由 Player 按姿态平滑传入） */
+    public updateAnimation(
+        walkTime: number,
+        isMoving: boolean,
+        headPitch: number = 0,
+        squatAmount: number = 0
+    ) {
+        const s = THREE.MathUtils.clamp(squatAmount, 0, 1);
+        const dropY = -s * 11 * this.PX;
+        const bend = s * 0.48;
 
         if (isMoving) {
-            const angle = Math.sin(walkTime * 10) * 0.5;
-            this.leftArm.rotation.x = angle;
-            this.rightArm.rotation.x = -angle;
-            this.leftLeg.rotation.x = -angle;
-            this.rightLeg.rotation.x = angle;
-            
-            // Body bobbing (只作用于内部 group，不干扰根节点的 Y 轴定位)
-            this.contentGroup.position.y = Math.abs(Math.cos(walkTime * 10)) * 0.05;
-        } else {
-            const lerp = 0.1;
+            const pace = THREE.MathUtils.lerp(10, 6.5, s);
+            const swing = THREE.MathUtils.lerp(0.5, 0.36, s);
+            const angle = Math.sin(walkTime * pace) * swing;
+
+            this.leftArm.rotation.z = THREE.MathUtils.lerp(0, -0.1, s);
+            this.rightArm.rotation.z = THREE.MathUtils.lerp(0, 0.1, s);
+
+            this.leftArm.rotation.x = angle + bend * 0.35;
+            this.rightArm.rotation.x = -angle - bend * 0.35;
+
+            const legSwing = THREE.MathUtils.lerp(1, 0.72, s);
+            this.leftLeg.rotation.z = THREE.MathUtils.lerp(0, -0.12, s);
+            this.rightLeg.rotation.z = THREE.MathUtils.lerp(0, 0.12, s);
+            this.leftLeg.rotation.x = legSwing * (-angle) + bend;
+            this.rightLeg.rotation.x = legSwing * angle - bend;
+
+            const bob = Math.abs(Math.cos(walkTime * pace)) * THREE.MathUtils.lerp(0.05, 0.02, s);
+            this.contentGroup.position.y = dropY + bob;
+
+            this.headGroup.rotation.x = headPitch + THREE.MathUtils.lerp(0, -0.1, s);
+            this.headGroup.position.y = 24 * this.PX;
+            return;
+        }
+
+        const lerp = 0.1;
+        const breath = Math.sin(Date.now() * 0.002) * 0.02;
+
+        if (s < 1e-3) {
             this.leftArm.rotation.x += (0 - this.leftArm.rotation.x) * lerp;
             this.rightArm.rotation.x += (0 - this.rightArm.rotation.x) * lerp;
+            this.leftArm.rotation.z += (0 - this.leftArm.rotation.z) * lerp;
+            this.rightArm.rotation.z += (0 - this.rightArm.rotation.z) * lerp;
             this.leftLeg.rotation.x += (0 - this.leftLeg.rotation.x) * lerp;
             this.rightLeg.rotation.x += (0 - this.rightLeg.rotation.x) * lerp;
-            this.contentGroup.position.y *= (1 - lerp);
-
-            const breath = Math.sin(Date.now() * 0.002) * 0.02;
-            this.headGroup.position.y = 24 * this.PX + breath;
+            this.leftLeg.rotation.z += (0 - this.leftLeg.rotation.z) * lerp;
+            this.rightLeg.rotation.z += (0 - this.rightLeg.rotation.z) * lerp;
+            this.contentGroup.position.y *= 1 - lerp;
+            this.headGroup.rotation.x += (headPitch - this.headGroup.rotation.x) * lerp;
+            this.headGroup.position.y += (24 * this.PX + breath - this.headGroup.position.y) * lerp;
+            return;
         }
+
+        const armIdleShift = bend * Math.sin(Date.now() * 0.0012);
+        this.leftArm.rotation.x += (armIdleShift - this.leftArm.rotation.x) * lerp;
+        this.rightArm.rotation.x += (-armIdleShift - this.rightArm.rotation.x) * lerp;
+        this.leftArm.rotation.z += (THREE.MathUtils.lerp(0, -0.06, s) - this.leftArm.rotation.z) * lerp;
+        this.rightArm.rotation.z += (THREE.MathUtils.lerp(0, 0.06, s) - this.rightArm.rotation.z) * lerp;
+
+        const legIdle = bend * 0.9;
+        this.leftLeg.rotation.x += (legIdle - this.leftLeg.rotation.x) * lerp;
+        this.rightLeg.rotation.x += (-legIdle - this.rightLeg.rotation.x) * lerp;
+        this.leftLeg.rotation.z += (THREE.MathUtils.lerp(0, -0.08, s) - this.leftLeg.rotation.z) * lerp;
+        this.rightLeg.rotation.z += (THREE.MathUtils.lerp(0, 0.08, s) - this.rightLeg.rotation.z) * lerp;
+
+        const contentGoal = dropY + breath * 3 * this.PX;
+        this.contentGroup.position.y += (contentGoal - this.contentGroup.position.y) * lerp;
+
+        const headYOffset = 24 * this.PX + breath - s * this.PX * 2;
+        this.headGroup.position.y += (headYOffset - this.headGroup.position.y) * lerp;
+        this.headGroup.rotation.x +=
+            (headPitch + THREE.MathUtils.lerp(0, -0.08, s) - this.headGroup.rotation.x) * lerp;
     }
 }

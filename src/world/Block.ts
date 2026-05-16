@@ -38,6 +38,7 @@ export enum BlockType {
     STICK = 61,
     WOODEN_PICKAXE = 62,
     STONE_PICKAXE = 63,
+    CRAFTING_TABLE = 64,
 
     // Fluids
     WATER = 50,
@@ -234,6 +235,7 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         isOpaque: false,
         isSolid: false,
         hardness: 0,
+        isPlaceable: false,
         textures: { all: [13, 1] },
         isEdible: true,
         nutrition: 3,
@@ -265,6 +267,14 @@ export const BLOCK_DATA: Record<number, BlockData> = {
         hardness: 0,
         isPlaceable: false,
         textures: { all: [6, 2] }
+    },
+    [BlockType.CRAFTING_TABLE]: {
+        name: 'Crafting Table',
+        renderType: RenderType.CUBE,
+        isOpaque: true,
+        isSolid: true,
+        hardness: 2.5,
+        textures: { top: [11, 3], bottom: [4, 0], side: [11, 2] }
     },
     [BlockType.WATER]: {
         name: 'Water',
